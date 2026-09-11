@@ -1,26 +1,24 @@
-[
-  {
-    "Author": "Rayla Petal",
-    "Name": "WatchAlong",
-    "InternalName": "WatchAlong",
-    "AssemblyVersion": "0.1.2.0",
-    "Description": "Puts a Kosmi room on a screen inside FFXIV, joining as a real Kosmi guest via a\nsandboxed out-of-process browser, so playback stays perfectly synced with the rest of the room.\n\nCommands:\n/wa - toggle the main viewer/control window\n/wa view - open the main window\n/wa join <kosmi url or WA1: invite> - join a room, or accept an invite (with confirmation)\n/wa settings - open Settings (identity, volume/mute, join/leave, invite, screen placement)\n/wa invite - copy a shareable invite for your current room and screen\n/wa sync <WA1P: message> - apply a shared screen position (with confirmation)\n/wa place - open the screen placement window\n/wa depth - toggle quad vs. depth-tested screen rendering\n/wa vol <0-150> - set volume\n/wa mute - toggle mute\n/wa snapshot - save a debug screenshot + DOM outline",
-    "ApplicableVersion": "any",
-    "RepoUrl": "https://github.com/RaylaPetal/kosmi-watch-14",
-    "Tags": [
-      "kosmi",
-      "watch-along",
-      "video"
-    ],
-    "DalamudApiLevel": 15,
-    "LoadRequiredState": 0,
-    "LoadSync": false,
-    "CanUnloadAsync": false,
-    "LoadPriority": 0,
-    "Punchline": "Watch a Kosmi room together, in-game.",
-    "AcceptsFeedback": true,
-    "DownloadLinkInstall": "https://github.com/RaylaPetal/kosmi-watch-14/releases/latest/download/WatchAlong.zip",
-    "DownloadLinkTesting": "https://github.com/RaylaPetal/kosmi-watch-14/releases/latest/download/WatchAlong.zip",
-    "DownloadLinkUpdate": "https://github.com/RaylaPetal/kosmi-watch-14/releases/latest/download/WatchAlong.zip"
-  }
-]
+{
+  "Author": "Rayla Petal",
+  "Name": "WatchAlong",
+  "InternalName": "WatchAlong",
+  "AssemblyVersion": "0.1.2.0",
+  "Description": "Puts a Kosmi room on a screen inside FFXIV, joining as a real Kosmi guest via a\r\nsandboxed out-of-process browser, so playback stays perfectly synced with the rest of the room.\r\n\r\nCommands:\r\n/wa - toggle the main viewer/control window\r\n/wa view - open the main window\r\n/wa join <kosmi url or WA1: invite> - join a room, or accept an invite (with confirmation)\r\n/wa settings - open Settings (identity, volume/mute, join/leave, invite, screen placement)\r\n/wa invite - copy a shareable invite for your current room and screen\r\n/wa sync <WA1P: message> - apply a shared screen position (with confirmation)\r\n/wa place - open the screen placement window\r\n/wa depth - toggle quad vs. depth-tested screen rendering\r\n/wa vol <0-150> - set volume\r\n/wa mute - toggle mute\r\n/wa snapshot - save a debug screenshot + DOM outline",
+  "ApplicableVersion": "any",
+  "RepoUrl": "https://github.com/RaylaPetal/kosmi-watch-14",
+  "Tags": [
+    "kosmi",
+    "watch-along",
+    "video"
+  ],
+  "DalamudApiLevel": 15,
+  "LoadRequiredState": 0,
+  "LoadSync": false,
+  "CanUnloadAsync": false,
+  "LoadPriority": 0,
+  "Punchline": "Watch a Kosmi room together, in-game.",
+  "AcceptsFeedback": true,
+  "DownloadLinkInstall": "https://github.com/RaylaPetal/kosmi-watch-14/releases/latest/download/WatchAlong.zip",
+  "DownloadLinkTesting": "https://github.com/RaylaPetal/kosmi-watch-14/releases/latest/download/WatchAlong.zip",
+  "DownloadLinkUpdate": "https://github.com/RaylaPetal/kosmi-watch-14/releases/latest/download/WatchAlong.zip"
+}
