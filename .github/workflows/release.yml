@@ -58,8 +58,10 @@ jobs:
         $manifest | Add-Member -NotePropertyName DownloadLinkInstall -NotePropertyValue $downloadUrl -Force
         $manifest | Add-Member -NotePropertyName DownloadLinkTesting -NotePropertyValue $downloadUrl -Force
         $manifest | Add-Member -NotePropertyName DownloadLinkUpdate -NotePropertyValue $downloadUrl -Force
-        $repo = @($manifest)
-        $json = $repo | ConvertTo-Json -Depth 10
+        # -AsArray is required here: ConvertTo-Json silently unwraps a single-element array back
+        # to a bare object without it, which produced a repo.json that was a JSON object instead
+        # of the array Dalamud's custom-repository format requires.
+        $json = ConvertTo-Json -InputObject @($manifest) -Depth 10 -AsArray
         [System.IO.File]::WriteAllText("$pwd\repo.json.new", "$json`n")
 
         git fetch origin master
