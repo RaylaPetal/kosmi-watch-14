@@ -336,3 +336,45 @@ test("buildRoomInfo carries title, members and optional presenter", () => {
   const info = agent.buildRoomInfo("Movie night", ["Ray", "Aya (in-game)"], "Ray");
   assert.deepEqual(info, { type: "room", title: "Movie night", members: ["Ray", "Aya (in-game)"], presenter: "Ray" });
 });
+
+// ---- room roster detection ----
+
+const roomProfile = Object.assign({}, profile, { participantNameSelector: "[class*='name']" });
+
+test("findRoomInfo reads a name from each participant tile and the page title", () => {
+  const dom = makeDom(
+    "<title>Movie night</title>" +
+    "<div class='participant'><span class='name'>Ray</span></div>" +
+    "<div class='participant'><span class='name'>Aya (in-game)</span></div>"
+  );
+
+  const info = agent.findRoomInfo(dom.window.document, roomProfile);
+
+  assert.equal(info.title, "Movie night");
+  assert.deepEqual(info.members, ["Ray", "Aya (in-game)"]);
+  assert.equal(info.presenter, null);
+});
+
+test("findRoomInfo dedupes repeated names and skips tiles with no readable name", () => {
+  const dom = makeDom(
+    "<div class='participant'><span class='name'>Ray</span></div>" +
+    "<div class='participant'><span class='name'>Ray</span></div>" +
+    "<div class='participant'></div>"
+  );
+
+  const info = agent.findRoomInfo(dom.window.document, roomProfile);
+  assert.deepEqual(info.members, ["Ray"]);
+});
+
+test("findRoomInfo returns no members when the profile has no participantNameSelector", () => {
+  const dom = makeDom("<div class='participant'><span class='name'>Ray</span></div>");
+  const info = agent.findRoomInfo(dom.window.document, profile);
+  assert.deepEqual(info.members, []);
+});
+
+test("findRoomInfo returns no members when no participant tiles are found", () => {
+  const dom = makeDom("<title>Empty room</title><div>nothing here</div>");
+  const info = agent.findRoomInfo(dom.window.document, roomProfile);
+  assert.equal(info.title, "Empty room");
+  assert.deepEqual(info.members, []);
+});

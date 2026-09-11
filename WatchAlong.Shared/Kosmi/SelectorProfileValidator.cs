@@ -84,5 +84,8 @@ public static class SelectorProfileValidator
             yield return profile.Chat.Input;
         if (profile.Chat.Send is not null)
             yield return profile.Chat.Send;
+
+        if (profile.ParticipantNameSelector is not null)
+            yield return profile.ParticipantNameSelector;
     }
 }

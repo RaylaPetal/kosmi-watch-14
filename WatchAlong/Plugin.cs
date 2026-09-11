@@ -177,7 +177,8 @@ public sealed class Plugin : IDalamudPlugin
             onCommit: () => { },
             onCancel: () => { },
             getDisplayName: () => Configuration.KosmiDisplayName,
-            copyToClipboard: CopyToClipboard);
+            copyToClipboard: CopyToClipboard,
+            getRenderMode: () => Configuration.ScreenRenderMode);
 
         // No more control-mode split (the video window handles input directly, see
         // ViewerWindow) — every other session action lives in one settings window instead of
@@ -193,7 +194,8 @@ public sealed class Plugin : IDalamudPlugin
             // join something" signal — it's only ever set by a successful TryOpenRoom and
             // cleared by CloseRoom, so it can't show a stray "Leave Room" button before anyone
             // has joined anything.
-            hasActiveSession: () => _sessionController.CurrentRoomCode is not null);
+            hasActiveSession: () => _sessionController.CurrentRoomCode is not null,
+            getRoomInfo: () => _sessionController.Session.RoomInfo);
 
         // Groups (Phase 3a, design.md §9.3): a chat-detected WA1:/WA1P: token becomes a
         // clickable link, routed through the same confirmation the /wa join and /wa sync
@@ -452,7 +454,12 @@ public sealed class Plugin : IDalamudPlugin
     {
         _confirmationWindow.Show(
             $"Sync screen to {share.Name}'s placement?",
-            () => _screenController.ApplyExternalAnchor(share.Anchor));
+            () =>
+            {
+                _screenController.ApplyExternalAnchor(share.Anchor);
+                Configuration.ScreenRenderMode = share.RenderMode;
+                Configuration.Save();
+            });
     }
 
     private void WipeAndRedownload()

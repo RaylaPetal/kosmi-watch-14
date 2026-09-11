@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using WatchAlong.Shared.Ipc;
 using WatchAlong.Shared.Kosmi;
 using WatchAlong.Shared.Screens;
 
@@ -10,8 +11,8 @@ namespace WatchAlong.Shared.Invites;
 /// <summary>A decoded, validated <c>WA1:</c> invite (group-invites spec "An invite is self-contained...").</summary>
 public sealed record DecodedInvite(string RoomCode, string Name, ScreenAnchor? Anchor);
 
-/// <summary>A decoded, validated <c>WA1P:</c> position-share message (group-invites spec "A user can share their placed screen's current position on demand").</summary>
-public sealed record DecodedPositionShare(string Name, ScreenAnchor Anchor);
+/// <summary>A decoded, validated <c>WA1P:</c> position-share message (group-invites spec "A user can share their placed screen's current position on demand"). <see cref="RenderMode"/> defaults to <see cref="ScreenRenderMode.Quad"/> for shares encoded before it existed.</summary>
+public sealed record DecodedPositionShare(string Name, ScreenAnchor Anchor, ScreenRenderMode RenderMode);
 
 /// <summary>
 /// Encodes/decodes the two self-contained, serverless chat tokens from design.md §9.3: a room
@@ -72,10 +73,10 @@ public static class InviteCodec
         return true;
     }
 
-    /// <summary>Encodes a standalone position-share message for <paramref name="anchor"/>. Throws <see cref="ArgumentException"/> for an empty name.</summary>
-    public static string EncodePositionShare(string name, ScreenAnchor anchor)
+    /// <summary>Encodes a standalone position-share message for <paramref name="anchor"/>, including the sender's depth on/off <paramref name="renderMode"/>. Throws <see cref="ArgumentException"/> for an empty name.</summary>
+    public static string EncodePositionShare(string name, ScreenAnchor anchor, ScreenRenderMode renderMode)
     {
-        var dto = new ShareDto(CurrentVersion, ClampName(name), ToAnchorDto(anchor));
+        var dto = new ShareDto(CurrentVersion, ClampName(name), ToAnchorDto(anchor), (int)renderMode);
         return PositionSharePrefix + EncodePayload(dto);
     }
 
@@ -92,7 +93,8 @@ public static class InviteCodec
         if (dto.V != CurrentVersion || string.IsNullOrEmpty(dto.N) || dto.A is null || !TryFromAnchorDto(dto.A, out var anchor))
             return false;
 
-        share = new DecodedPositionShare(dto.N, anchor!);
+        var renderMode = Enum.IsDefined(typeof(ScreenRenderMode), dto.M) ? (ScreenRenderMode)dto.M : ScreenRenderMode.Quad;
+        share = new DecodedPositionShare(dto.N, anchor!, renderMode);
         return true;
     }
 
@@ -212,5 +214,6 @@ public static class InviteCodec
     private sealed record ShareDto(
         [property: JsonPropertyName("v")] int V,
         [property: JsonPropertyName("n")] string N,
-        [property: JsonPropertyName("a")] AnchorDto? A);
+        [property: JsonPropertyName("a")] AnchorDto? A,
+        [property: JsonPropertyName("m")] int M = (int)ScreenRenderMode.Quad);
 }

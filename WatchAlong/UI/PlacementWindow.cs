@@ -3,6 +3,7 @@ using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using WatchAlong.Shared.Invites;
+using WatchAlong.Shared.Ipc;
 using WatchAlong.Shared.Screens;
 
 namespace WatchAlong.UI;
@@ -25,6 +26,7 @@ public sealed class PlacementWindow : Window
     private readonly Action _onCancel;
     private readonly Func<string> _getDisplayName;
     private readonly Action<string> _copyToClipboard;
+    private readonly Func<ScreenRenderMode> _getRenderMode;
 
     private ScreenTransform? _editing;
 
@@ -34,7 +36,8 @@ public sealed class PlacementWindow : Window
         Action onCommit,
         Action onCancel,
         Func<string> getDisplayName,
-        Action<string> copyToClipboard)
+        Action<string> copyToClipboard,
+        Func<ScreenRenderMode> getRenderMode)
         : base("WatchAlong Screen Placement##WatchAlongPlacement")
     {
         _screenController = screenController;
@@ -43,6 +46,7 @@ public sealed class PlacementWindow : Window
         _onCancel = onCancel;
         _getDisplayName = getDisplayName;
         _copyToClipboard = copyToClipboard;
+        _getRenderMode = getRenderMode;
     }
 
     /// <summary>True while the gizmo owns input — <c>InputRouter</c>/control mode should not also receive it (design.md D6).</summary>
@@ -128,7 +132,7 @@ public sealed class PlacementWindow : Window
         // does not trigger a share on its own": only this explicit button ever encodes/copies a
         // share message — dragging, resizing, or rotating above never does.
         if (_screenController.ActiveAnchor is { } activeAnchor && ImGui.Button("Share position"))
-            _copyToClipboard(InviteCodec.EncodePositionShare(_getDisplayName(), activeAnchor));
+            _copyToClipboard(InviteCodec.EncodePositionShare(_getDisplayName(), activeAnchor, _getRenderMode()));
     }
 
     private ScreenTransform PlaceInFrontOfPlayer()

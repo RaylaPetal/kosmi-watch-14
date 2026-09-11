@@ -3,6 +3,7 @@ using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
+using WatchAlong.Shared.Ipc;
 
 namespace WatchAlong.UI;
 
@@ -21,6 +22,7 @@ public sealed class ConfigWindow : Window, IDisposable
     private readonly Action _openPlacement;
     private readonly Action _copyInvite;
     private readonly Func<bool> _hasActiveSession;
+    private readonly Func<RoomInfoMessage?> _getRoomInfo;
 
     private string _displayName;
     private float _volume;
@@ -35,7 +37,8 @@ public sealed class ConfigWindow : Window, IDisposable
         Action leaveRoom,
         Action openPlacement,
         Action copyInvite,
-        Func<bool> hasActiveSession)
+        Func<bool> hasActiveSession,
+        Func<RoomInfoMessage?> getRoomInfo)
         : base("WatchAlong Settings##WatchAlongSettings")
     {
         SizeConstraints = new WindowSizeConstraints
@@ -51,6 +54,7 @@ public sealed class ConfigWindow : Window, IDisposable
         _openPlacement = openPlacement;
         _copyInvite = copyInvite;
         _hasActiveSession = hasActiveSession;
+        _getRoomInfo = getRoomInfo;
 
         _displayName = configuration.KosmiDisplayName;
         _volume = configuration.MasterVolume;
@@ -91,6 +95,20 @@ public sealed class ConfigWindow : Window, IDisposable
         {
             var name = string.IsNullOrWhiteSpace(_configuration.KosmiDisplayName) ? "(no display name set)" : _configuration.KosmiDisplayName;
             ImGui.TextUnformatted($"Joined as: {name}");
+
+            var roomInfo = _getRoomInfo();
+            if (roomInfo is { Members.Length: > 0 })
+            {
+                if (!string.IsNullOrWhiteSpace(roomInfo.Title))
+                    ImGui.TextUnformatted($"Room: {roomInfo.Title}");
+                ImGui.TextUnformatted($"Members: {string.Join(", ", roomInfo.Members)}");
+            }
+            else
+            {
+                // Detected from the page's own member list, not an authoritative API — see
+                // kosmi-session spec "Member list not detectable".
+                ImGui.TextDisabled("Member list unavailable");
+            }
 
             if (ImGui.Button("Leave Room"))
             {

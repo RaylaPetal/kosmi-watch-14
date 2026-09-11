@@ -330,6 +330,28 @@
     return { type: "room", title: title, members: members, presenter: presenter || null };
   }
 
+  // ---- room roster detection: reads a name from within each participant-tile match ----
+
+  /** No presenter signal exists in the profile today, so it's always null here — buildRoomInfo still accepts one for when that changes. */
+  function findRoomInfo(doc, profile) {
+    var members = [];
+
+    if (profile.participantNameSelector) {
+      var tiles = [];
+      (profile.participantTileSelectors || []).forEach(function (sel) {
+        tiles = tiles.concat(querySelectorAllExt(doc, sel));
+      });
+
+      tiles.forEach(function (tile) {
+        var nameEl = tile.querySelector(profile.participantNameSelector);
+        var name = nameEl ? (nameEl.textContent || "").trim() : "";
+        if (name && members.indexOf(name) === -1) members.push(name);
+      });
+    }
+
+    return { title: (doc.title || "").trim(), members: members, presenter: null };
+  }
+
   // ---- 5.8: participant voice muting (default RoomVoiceMode.Off) ----
 
   function muteAllExceptPrimary(doc, primaryEl) {
@@ -354,6 +376,7 @@
     computeContentRect: computeContentRect,
     buildMediaState: buildMediaState,
     buildRoomInfo: buildRoomInfo,
+    findRoomInfo: findRoomInfo,
     muteAllExceptPrimary: muteAllExceptPrimary,
   };
 });

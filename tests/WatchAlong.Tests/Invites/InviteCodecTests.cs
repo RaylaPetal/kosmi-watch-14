@@ -1,5 +1,6 @@
 using System.Numerics;
 using WatchAlong.Shared.Invites;
+using WatchAlong.Shared.Ipc;
 using WatchAlong.Shared.Screens;
 using Xunit;
 
@@ -43,12 +44,24 @@ public class InviteCodecTests
     public void Position_share_round_trips()
     {
         var anchor = MakeAnchor();
-        var token = InviteCodec.EncodePositionShare("Ray", anchor);
+        var token = InviteCodec.EncodePositionShare("Ray", anchor, ScreenRenderMode.DepthTested);
 
         Assert.StartsWith(InviteCodec.PositionSharePrefix, token);
         Assert.True(InviteCodec.TryDecodePositionShare(token, out var share));
         Assert.Equal("Ray", share.Name);
         Assert.Equal(anchor, share.Anchor);
+        Assert.Equal(ScreenRenderMode.DepthTested, share.RenderMode);
+    }
+
+    [Fact]
+    public void Position_share_without_a_render_mode_field_defaults_to_quad()
+    {
+        // Pre-existing shares (encoded before the "m" field existed) carry no render mode at all.
+        var anchorJson = "{\"k\":\"house_1\",\"p\":[1,2,3],\"q\":[4,5,6],\"s\":[3,1.6875]}";
+        var token = InviteCodec.PositionSharePrefix + InviteEncodeForTest(v: 1, n: "Ray", anchorJson: anchorJson);
+
+        Assert.True(InviteCodec.TryDecodePositionShare(token, out var share));
+        Assert.Equal(ScreenRenderMode.Quad, share.RenderMode);
     }
 
     [Fact]

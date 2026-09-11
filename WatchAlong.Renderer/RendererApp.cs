@@ -130,6 +130,7 @@ public sealed class RendererApp(RendererAppArgs args)
                     _browser = browser;
                     browser!.PageStateChanged += state => _ = SendAsync(pipe, new PageStateMessage(state, null), cancellationToken);
                     browser.MediaStateChanged += media => _ = SendAsync(pipe, media, cancellationToken);
+                    browser.RoomInfoChanged += room => _ = SendAsync(pipe, room, cancellationToken);
                     // Task 7.3: the plugin opens this exact mapping once it receives this message.
                     await SendAsync(pipe, new FrameRingInfoMessage(args.ShmemBaseName, FrameSlotCount, MaxWidth, MaxHeight), cancellationToken);
 
