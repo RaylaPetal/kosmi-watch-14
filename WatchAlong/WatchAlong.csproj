@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.1.1.0</Version>
-    <Author>Thiago (RayPetal)</Author>
+    <Version>0.1.2.0</Version>
+    <Author>Rayla Petal</Author>
     <Name>WatchAlong</Name>
     <Punchline>Watch a Kosmi room together, in-game.</Punchline>
     <Description>Puts a Kosmi room on a screen inside FFXIV, joining as a real Kosmi guest via a
