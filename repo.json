@@ -3,7 +3,7 @@
     "Author": "Thiago (RayPetal)",
     "Name": "WatchAlong",
     "InternalName": "WatchAlong",
-    "AssemblyVersion": "0.1.0.0",
+    "AssemblyVersion": "0.1.1.0",
     "Description": "Puts a Kosmi room on a screen inside FFXIV, joining as a real Kosmi guest via a\nsandboxed out-of-process browser, so playback stays perfectly synced with the rest of the room.\n\nCommands:\n/wa - toggle the main viewer/control window\n/wa view - open the main window\n/wa join <kosmi url or WA1: invite> - join a room, or accept an invite (with confirmation)\n/wa settings - open Settings (identity, volume/mute, join/leave, invite, screen placement)\n/wa invite - copy a shareable invite for your current room and screen\n/wa sync <WA1P: message> - apply a shared screen position (with confirmation)\n/wa place - open the screen placement window\n/wa depth - toggle quad vs. depth-tested screen rendering\n/wa vol <0-150> - set volume\n/wa mute - toggle mute\n/wa snapshot - save a debug screenshot + DOM outline",
     "ApplicableVersion": "any",
     "RepoUrl": "https://github.com/RaylaPetal/kosmi-watch-14",

@@ -10,6 +10,9 @@ jobs:
 
   build:
     runs-on: windows-2022
+    # Safety net: a hung step (e.g. a spawned test process that never exits) should fail fast,
+    # not burn the default 6-hour job timeout every time it happens.
+    timeout-minutes: 20
 
     steps:
     - name: Checkout
@@ -25,6 +28,9 @@ jobs:
         Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile latest.zip
         Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev"
 
+    # GitHub Actions runners set CI=true automatically — RendererProcessHostTests reads it to
+    # skip the two tests that spawn a real renderer process (see that file's comment: one such
+    # test hung indefinitely on windows-2022, never exiting within its own 20s Wait()).
     - name: Test
       run: dotnet test tests/WatchAlong.Tests/WatchAlong.Tests.csproj --configuration Release
 

@@ -12,6 +12,7 @@ jobs:
 
   release:
     runs-on: windows-2022
+    timeout-minutes: 20
 
     steps:
     - name: Checkout
