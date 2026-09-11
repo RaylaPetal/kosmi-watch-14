@@ -1,7 +1,4 @@
 <Solution>
-  <Project Path="SamplePlugin/SamplePlugin.csproj">
-    <Platform Project="x64" />
-  </Project>
   <Project Path="WatchAlong.Shared/WatchAlong.Shared.csproj" />
   <Project Path="WatchAlong/WatchAlong.csproj">
     <Platform Project="x64" />

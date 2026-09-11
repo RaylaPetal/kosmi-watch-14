@@ -1,16 +1,15 @@
-name: Sample PR Builder for SamplePlugin
+name: Build
 
 on:
   pull_request:
+    branches: [ master ]
+  push:
     branches: [ master ]
 
 jobs:
 
   build:
     runs-on: windows-2022
-
-    env:
-      Solution_Name: SamplePlugin
 
     steps:
     - name: Checkout
@@ -26,14 +25,16 @@ jobs:
         Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile latest.zip
         Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev"
 
+    - name: Test
+      run: dotnet test tests/WatchAlong.Tests/WatchAlong.Tests.csproj --configuration Release
+
     - name: Build with dotnet
-      run: dotnet build --configuration Release
+      run: dotnet build WatchAlong.slnx --configuration Release
 
     - name: Store artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: SamplePlugin
-        path: .\SamplePlugin\bin\x64\Release\SamplePlugin\*
+        name: WatchAlong
+        path: .\WatchAlong\bin\x64\Release\*
         if-no-files-found: error
-        retention-days: 1
-
+        retention-days: 7

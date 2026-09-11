@@ -8,7 +8,7 @@ public class EmbeddedDefaultProfileTests
     private static string FindDefaultProfilePath()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "SamplePlugin.slnx")))
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "WatchAlong.slnx")))
             dir = dir.Parent;
 
         Assert.NotNull(dir);

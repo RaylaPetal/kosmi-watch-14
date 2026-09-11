@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+
+  release:
+    runs-on: windows-2022
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - name: Install .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Download Dalamud
+      run: |
+        Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile latest.zip
+        Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev"
+
+    - name: Test
+      run: dotnet test tests/WatchAlong.Tests/WatchAlong.Tests.csproj --configuration Release
+
+    - name: Build with dotnet
+      run: dotnet build WatchAlong.slnx --configuration Release
+
+    # Dalamud expects a flat zip: the plugin DLL and its manifest JSON sit at the
+    # zip root, not nested inside a folder.
+    - name: Package plugin zip
+      run: Compress-Archive -Path ".\WatchAlong\bin\x64\Release\*" -DestinationPath "WatchAlong.zip" -Force
+
+    - name: Create GitHub release
+      uses: softprops/action-gh-release@v2
+      with:
+        # A fixed asset name (not versioned) so repo.json's download links can point at
+        # /releases/latest/download/WatchAlong.zip forever, instead of needing to be
+        # rewritten every release.
+        files: WatchAlong.zip
+        generate_release_notes: true
+
+    # repo.json (the custom-repository "pluginmaster") is regenerated from the manifest
+    # this build actually produced, so its AssemblyVersion always matches what's inside
+    # the just-published zip — never hand-edited or allowed to drift.
+    - name: Update repo.json on master
+      shell: pwsh
+      run: |
+        $manifest = Get-Content ".\WatchAlong\bin\x64\Release\WatchAlong.json" | ConvertFrom-Json
+        $downloadUrl = "https://github.com/${{ github.repository }}/releases/latest/download/WatchAlong.zip"
+        $manifest | Add-Member -NotePropertyName DownloadLinkInstall -NotePropertyValue $downloadUrl -Force
+        $manifest | Add-Member -NotePropertyName DownloadLinkTesting -NotePropertyValue $downloadUrl -Force
+        $manifest | Add-Member -NotePropertyName DownloadLinkUpdate -NotePropertyValue $downloadUrl -Force
+        $repo = @($manifest)
+        $json = $repo | ConvertTo-Json -Depth 10
+        [System.IO.File]::WriteAllText("$pwd\repo.json.new", "$json`n")
+
+        git fetch origin master
+        git checkout master
+        Move-Item -Force repo.json.new repo.json
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add repo.json
+        git diff --cached --quiet || git commit -m "chore: update repo.json for ${{ github.ref_name }}"
+        git push origin master

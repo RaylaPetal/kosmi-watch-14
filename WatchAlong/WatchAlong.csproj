@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.0.0.1</Version>
+    <Version>0.1.0.0</Version>
     <Author>Thiago (RayPetal)</Author>
     <Name>WatchAlong</Name>
     <Punchline>Watch a Kosmi room together, in-game.</Punchline>
@@ -20,7 +20,7 @@ Commands:
 /wa vol &lt;0-150&gt; - set volume
 /wa mute - toggle mute
 /wa snapshot - save a debug screenshot + DOM outline</Description>
-    <RepoUrl>https://github.com/raypetal/WatchAlong</RepoUrl>
+    <RepoUrl>https://github.com/RaylaPetal/kosmi-watch-14</RepoUrl>
     <Tags>kosmi;watch-along;video</Tags>
   </PropertyGroup>
 
