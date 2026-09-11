@@ -1,0 +1,11 @@
+<!doctype html>
+<html>
+<head><title>Fake Kosmi — YouTube-shaped iframe</title></head>
+<body>
+  <h1>Shared YouTube link</h1>
+  <!-- Mimics a Kosmi-embedded YouTube iframe closely enough to exercise the primary-media
+       scoring's "known player host" bonus (design.md §6.4 item 3), without depending on the
+       real youtube.com being reachable in CI. -->
+  <iframe id="player" src="https://www.youtube.com/embed/dQw4w9WgXcQ" width="640" height="360"></iframe>
+</body>
+</html>

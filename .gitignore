@@ -2,3 +2,12 @@
 obj/
 bin/
 *.user
+
+# AI coding assistant configs/skills — local tooling, not project source
+.agents/
+.claude/
+.cline/
+.clinerules/
+
+# OpenSpec planning artifacts — process/scratch, not shipped code
+openspec/

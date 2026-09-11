@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>WatchAlong.Renderer</AssemblyName>
+    <RootNamespace>WatchAlong.Renderer</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Framework-dependent: the renderer runs on Dalamud's own .NET runtime via DOTNET_ROOT,
+         it must not carry its own runtime (see CefBootstrap / design.md D6). -->
+    <SelfContained>false</SelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CefSharp.OffScreen.NETCore" Version="149.0.60" />
+    <!-- CefSharp.Common.NETCore only carries the managed wrapper; the actual Chromium engine
+         (libcef.dll, icudtl.dat, resources.pak, v8 snapshots, ~150MB) ships in this separate
+         RID-specific package. CefSharp's own build-time logic is supposed to add it
+         automatically (see CefSharp.Common.NETCore.targets), but that conditional
+         PackageReference never resolved here — only the RID-less meta-package restored,
+         leaving libcef.dll missing and every renderer launch failing with
+         "Could not load file or assembly 'CefSharp.Core.Runtime.dll'. Module not found."
+         Referencing it directly makes the restore deterministic. -->
+    <PackageReference Include="chromiumembeddedframework.runtime.win-x64" Version="149.0.6" />
+    <!-- NAudio.Wasapi + NAudio.WinMM cover WasapiOut/WaveOutEvent (design.md AudioSink).
+         The full "NAudio" metapackage also pulls NAudio.WinForms, which needs the
+         Microsoft.WindowsDesktop.App.WindowsForms framework reference we don't otherwise
+         need and that isn't available outside a Windows Desktop SDK install. -->
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+    <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WatchAlong.Shared\WatchAlong.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\kosmi-agent.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\default-profile.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

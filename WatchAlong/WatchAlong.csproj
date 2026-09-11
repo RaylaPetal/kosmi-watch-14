@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <PropertyGroup>
+    <Version>0.0.0.1</Version>
+    <Author>Thiago (RayPetal)</Author>
+    <Name>WatchAlong</Name>
+    <Punchline>Watch a Kosmi room together, in-game.</Punchline>
+    <Description>Puts a Kosmi room on a screen inside FFXIV, joining as a real Kosmi guest via a
+sandboxed out-of-process browser, so playback stays perfectly synced with the rest of the room.
+
+Commands:
+/wa - toggle the main viewer/control window
+/wa view - open the main window
+/wa join &lt;kosmi url or WA1: invite&gt; - join a room, or accept an invite (with confirmation)
+/wa settings - open Settings (identity, volume/mute, join/leave, invite, screen placement)
+/wa invite - copy a shareable invite for your current room and screen
+/wa sync &lt;WA1P: message&gt; - apply a shared screen position (with confirmation)
+/wa place - open the screen placement window
+/wa depth - toggle quad vs. depth-tested screen rendering
+/wa vol &lt;0-150&gt; - set volume
+/wa mute - toggle mute
+/wa snapshot - save a debug screenshot + DOM outline</Description>
+    <RepoUrl>https://github.com/raypetal/WatchAlong</RepoUrl>
+    <Tags>kosmi;watch-along;video</Tags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WatchAlong.Shared\WatchAlong.Shared.csproj" />
+    <!-- Builds WatchAlong.Renderer as part of building this project (so build order is
+         correct) without adding an assembly reference to it — the two only ever talk over
+         IPC, never by direct .NET type reference. -->
+    <ProjectReference Include="..\WatchAlong.Renderer\WatchAlong.Renderer.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="TerraFX.Interop.Windows" Version="10.0.26100.6" />
+    <!-- Screens/Ported/DepthTested/ (depth-tested occlusion, ported from XivMediaPlayer per
+         design.md Appendix C) is written against Vortice's object-oriented D3D11/DXGI/D3DCompiler
+         wrappers, same as the original — bridging one device pointer at the boundary (see
+         GameDevice.cs) rather than hand-porting ~2500 lines of unsafe pointer code line-by-line
+         to TerraFX (this project's existing interop layer). -->
+    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
+    <PackageReference Include="Vortice.DXGI" Version="3.8.3" />
+    <PackageReference Include="Vortice.D3DCompiler" Version="3.8.3" />
+    <PackageReference Include="Vortice.Mathematics" Version="2.1.1" />
+  </ItemGroup>
+
+  <!-- Ships WatchAlong.Renderer.exe (and its dependencies) next to the plugin DLL, so
+       Plugin.cs can find it at "<plugin assembly dir>/WatchAlong.Renderer.exe" with no
+       separate deploy step (see design.md §6.1.2 and Plugin.cs's rendererExe path). -->
+  <Target Name="CopyRendererOutput" AfterTargets="Build">
+    <!-- Ask MSBuild where the renderer project's output actually landed for this exact
+         Configuration/Platform, rather than guessing the bin/<platform>/<config>/<tfm> path
+         structure — that guess silently goes stale the moment this is built a different way
+         (e.g. via the .slnx, which maps this project to the x64 platform, vs. building this
+         .csproj directly, which doesn't). -->
+    <MSBuild Projects="..\WatchAlong.Renderer\WatchAlong.Renderer.csproj"
+             Targets="GetTargetPath"
+             Properties="Configuration=$(Configuration);Platform=$(Platform)">
+      <Output TaskParameter="TargetOutputs" ItemName="RendererTargetPath" />
+    </MSBuild>
+    <PropertyGroup>
+      <RendererOutputDir>%(RendererTargetPath.RootDir)%(RendererTargetPath.Directory)</RendererOutputDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <RendererOutputFiles Include="$(RendererOutputDir)**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(RendererOutputFiles)" DestinationFolder="$(OutDir)%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

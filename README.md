@@ -1,3 +1,25 @@
+# WatchAlong
+
+Puts a Kosmi room on a screen inside FFXIV. See `WatchAlong-Design-Doc.md` for the
+full design and `openspec/changes/watchalong-phase1-solo-viewer/` for the Phase 1
+("solo viewer") plan currently being implemented.
+
+## License and credits
+
+WatchAlong is licensed under the **GNU Affero General Public License v3.0** (see
+`LICENSE.md`), because it ports and adapts code from:
+
+- [`Sebane1/XivMediaPlayer`](https://github.com/Sebane1/XivMediaPlayer) (AGPL-3.0) —
+  `Direct3D11VideoTexture`, world-screen rendering, spatial-audio math, BGM
+  ducking, Wine detection, and CEF loader workarounds.
+- [`Styr1x/Browsingway`](https://github.com/Styr1x/Browsingway) — the
+  out-of-process CEF renderer pattern (separate exe, shared texture/IPC,
+  parent-PID watchdog).
+
+Ported files carry an SPDX header identifying their origin and license.
+
+---
+
 > ⚠️ **Don't click Fork!**
 > 
 > This is a GitHub Template repo. If you want to use this for a plugin, [use this template][new-repo] to make a new repo!

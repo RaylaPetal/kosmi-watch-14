@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+<head><title>Fake Kosmi — Navigation Attempt</title></head>
+<body>
+  <h1>Navigation policy fixture</h1>
+  <!-- Used by task 10.2: the renderer's NavigationPolicy allowlist is temporarily pointed at
+       this fixture host in the test, and this button attempts a top-level navigation away
+       from it — the assertion is that the navigation is cancelled. -->
+  <a id="leave" href="https://example.com/">Leave the fixture host</a>
+  <script>
+    document.getElementById('leave').addEventListener('click', () => {
+      document.title = 'navigation attempted';
+    });
+  </script>
+</body>
+</html>

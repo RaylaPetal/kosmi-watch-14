@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head><title>Fake Kosmi — WebRTC Loopback</title></head>
+<body>
+  <h1>Screen share (simulated)</h1>
+  <canvas id="source" width="320" height="240" style="display:none;"></canvas>
+  <video id="shared" autoplay muted playsinline width="320" height="240"></video>
+  <script>
+    // Two RTCPeerConnections in one page, streaming a canvas.captureStream() between them —
+    // a same-page loopback that exercises the WebRTC "kind" media-state path (design.md §16
+    // test fixtures) without needing a real signaling server or a second peer.
+    const canvas = document.getElementById('source');
+    const ctx = canvas.getContext('2d');
+    let hue = 0;
+    setInterval(() => {
+      hue = (hue + 5) % 360;
+      ctx.fillStyle = `hsl(${hue}, 80%, 50%)`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }, 100);
+
+    async function start() {
+      const stream = canvas.captureStream(15);
+      const pc1 = new RTCPeerConnection();
+      const pc2 = new RTCPeerConnection();
+
+      pc1.onicecandidate = (e) => e.candidate && pc2.addIceCandidate(e.candidate);
+      pc2.onicecandidate = (e) => e.candidate && pc1.addIceCandidate(e.candidate);
+      pc2.ontrack = (e) => { document.getElementById('shared').srcObject = e.streams[0]; };
+
+      for (const track of stream.getTracks()) pc1.addTrack(track, stream);
+
+      const offer = await pc1.createOffer();
+      await pc1.setLocalDescription(offer);
+      await pc2.setRemoteDescription(offer);
+      const answer = await pc2.createAnswer();
+      await pc2.setLocalDescription(answer);
+      await pc1.setRemoteDescription(answer);
+    }
+
+    start().catch((err) => {
+      document.title = 'WebRTC loopback failed: ' + err.message;
+    });
+  </script>
+</body>
+</html>

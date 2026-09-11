@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "profileVersion": "2026.09.10-1",
+  "minAgentVersion": 1,
+  "stateProbes": {
+    "joinGate":      { "any": ["input[name='nickname']", "button:has-text('Join')"] },
+    "roomNotFound":  { "textMatches": ["room (was )?not found", "doesn't exist"] },
+    "loginRequired": { "any": ["[data-testid='login-modal']"] }
+  },
+  "joinGate": { "nameInput": "input[name='nickname']", "submit": "button[type='submit']" },
+  "participantTileSelectors": [".participant", "[class*='webcam']"],
+  "primaryOverrides": [],
+  "fullscreenButton": null,
+  "chat": { "list": null, "input": null, "send": null }
+}

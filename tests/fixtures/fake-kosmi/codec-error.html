@@ -1,0 +1,11 @@
+<!doctype html>
+<html>
+<head><title>Fake Kosmi — MP4 (codec error path)</title></head>
+<body>
+  <h1>Shared link</h1>
+  <!-- Stock CEF builds lack H.264 decode support, so this element is expected to raise
+       error 4 (MEDIA_ERR_SRC_NOT_SUPPORTED) — exercising the DirectMedia fallback path
+       (design.md §13), not something WatchAlong Phase 1 needs to play. -->
+  <video id="shared" src="codec-error.mp4" controls></video>
+</body>
+</html>
