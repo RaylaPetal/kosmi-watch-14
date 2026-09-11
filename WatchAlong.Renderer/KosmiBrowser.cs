@@ -38,9 +38,6 @@ public sealed class KosmiBrowser : IDisposable
     /// <summary>Primary-media state reported by kosmi-agent.js (design.md §6.4 jobs 3/5).</summary>
     public event Action<MediaStateMessage>? MediaStateChanged;
 
-    /// <summary>Room title/member-list state reported by kosmi-agent.js's findRoomInfo, best-effort.</summary>
-    public event Action<RoomInfoMessage>? RoomInfoChanged;
-
     public KosmiBrowser(string safeRoomUrl, string displayName, string frameMapName, ushort frameSlotCount, int maxWidth, int maxHeight)
     {
         _displayName = displayName;
@@ -204,17 +201,6 @@ public sealed class KosmiBrowser : IDisposable
                         (int?)payload["error"]?.GetValue<double?>(),
                         rect));
                     break;
-
-                case "room":
-                    var members = payload["members"] is JsonArray membersArray
-                        ? membersArray.Select(n => n?.GetValue<string>() ?? "").ToArray()
-                        : [];
-
-                    RoomInfoChanged?.Invoke(new RoomInfoMessage(
-                        payload["title"]?.GetValue<string>() ?? "",
-                        members,
-                        payload["presenter"]?.GetValue<string>()));
-                    break;
             }
         }
         catch (Exception ex)
@@ -239,7 +225,6 @@ public sealed class KosmiBrowser : IDisposable
       var lastPageState = null;
       var primary = new agent.PrimarySelector();
       var lastAppliedPrimary = null;
-      var lastRoomInfoJson = null;
 
       function post(payload) {
         try { CefSharp.PostMessage(JSON.stringify(payload)); } catch (e) {}
@@ -257,13 +242,6 @@ public sealed class KosmiBrowser : IDisposable
         }
 
         if (state === 'InRoom') {
-          var roomInfo = agent.findRoomInfo(document, profile);
-          var roomInfoJson = JSON.stringify(roomInfo);
-          if (roomInfoJson !== lastRoomInfoJson) {
-            lastRoomInfoJson = roomInfoJson;
-            post(agent.buildRoomInfo(roomInfo.title, roomInfo.members, roomInfo.presenter));
-          }
-
           var candidate = agent.pickBestCandidate(document, profile, window.innerWidth, window.innerHeight);
           var current = primary.consider(candidate, Date.now());
 

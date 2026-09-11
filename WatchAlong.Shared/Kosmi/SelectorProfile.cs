@@ -15,10 +15,7 @@ public sealed record SelectorProfile(
     IReadOnlyList<string> ParticipantTileSelectors,
     IReadOnlyList<string> PrimaryOverrides,
     string? FullscreenButton,
-    ChatSelectors Chat,
-    // Queried within each ParticipantTileSelectors match (not page-wide) to read a member's
-    // display name for the room roster. Null/absent means member names can't be detected.
-    string? ParticipantNameSelector = null);
+    ChatSelectors Chat);
 
 public sealed record StateProbes(
     SelectorGroup JoinGate,

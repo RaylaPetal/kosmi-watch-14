@@ -11,6 +11,5 @@
   "participantTileSelectors": [".participant", "[class*='webcam']"],
   "primaryOverrides": [],
   "fullscreenButton": null,
-  "chat": { "list": null, "input": null, "send": null },
-  "participantNameSelector": "[class*='name']"
+  "chat": { "list": null, "input": null, "send": null }
 }

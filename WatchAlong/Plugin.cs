@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
 using Dalamud.Game.Command;
@@ -44,6 +45,9 @@ public sealed class Plugin : IDalamudPlugin
     private readonly RendererWatchdog _watchdog = new();
     private readonly RendererSupervisor _supervisor;
     private readonly KosmiSessionController _sessionController;
+
+    /// <summary>Display names of WatchAlong users seen this session via an accepted invite or position sync — not a live/authoritative roster, just who's been in contact (group-invites spec).</summary>
+    private readonly HashSet<string> _sessionMembers = [];
     private readonly RendererClient _rendererClient;
     private readonly Direct3D11VideoTexture _texture;
     private readonly ViewerWindow _viewerWindow;
@@ -195,7 +199,7 @@ public sealed class Plugin : IDalamudPlugin
             // cleared by CloseRoom, so it can't show a stray "Leave Room" button before anyone
             // has joined anything.
             hasActiveSession: () => _sessionController.CurrentRoomCode is not null,
-            getRoomInfo: () => _sessionController.Session.RoomInfo);
+            getSessionMembers: () => _sessionMembers);
 
         // Groups (Phase 3a, design.md §9.3): a chat-detected WA1:/WA1P: token becomes a
         // clickable link, routed through the same confirmation the /wa join and /wa sync
@@ -370,8 +374,14 @@ public sealed class Plugin : IDalamudPlugin
             _rendererClient.SendAsync(new SetAudioMessage(volume, muted)).ConfigureAwait(false);
     }
 
-    private bool JoinRoom(string roomUrlOrCode) =>
-        _sessionController.TryOpenRoom(roomUrlOrCode, Configuration.KosmiDisplayName, 1280, 720, Configuration.MaxFps, Configuration.VoiceMode, false);
+    private bool JoinRoom(string roomUrlOrCode)
+    {
+        if (!_sessionController.TryOpenRoom(roomUrlOrCode, Configuration.KosmiDisplayName, 1280, 720, Configuration.MaxFps, Configuration.VoiceMode, false))
+            return false;
+
+        _sessionMembers.Clear();
+        return true;
+    }
 
     /// <summary>Shared by `/wa join` and the Settings window's join field: a `WA1:` invite goes through the confirmation flow, anything else joins directly like before.</summary>
     private bool HandleJoinInput(string input)
@@ -410,6 +420,7 @@ public sealed class Plugin : IDalamudPlugin
     private void CloseRoom()
     {
         _sessionController.CloseRoom();
+        _sessionMembers.Clear();
         lock (_frameReaderLock)
         {
             _frameReader?.Dispose();
@@ -446,6 +457,7 @@ public sealed class Plugin : IDalamudPlugin
                 _viewerWindow.IsOpen = true;
                 if (invite.Anchor is not null)
                     _screenController.ApplyExternalAnchor(invite.Anchor);
+                _sessionMembers.Add(invite.Name);
             });
     }
 
@@ -459,6 +471,7 @@ public sealed class Plugin : IDalamudPlugin
                 _screenController.ApplyExternalAnchor(share.Anchor);
                 Configuration.ScreenRenderMode = share.RenderMode;
                 Configuration.Save();
+                _sessionMembers.Add(share.Name);
             });
     }
 
