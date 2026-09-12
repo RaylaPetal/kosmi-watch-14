@@ -139,6 +139,7 @@ public sealed class Plugin : IDalamudPlugin
         _sessionController.RendererSpawnFailed += ex => Log.Error(ex, "WatchAlong: failed to start the renderer process.");
         _rendererClient = new RendererClient(_sessionController, _watchdog);
         _rendererClient.FrameRingAnnounced += OnFrameRingAnnounced;
+        _rendererClient.ChatMemberAnnounced += announced => _sessionMembers.Add(announced.Name);
         _rendererClient.Log += msg => Log.Information(msg);
 
         _supervisor.SendOpenRoom += msg => _rendererClient.SendAsync(msg).ConfigureAwait(false);

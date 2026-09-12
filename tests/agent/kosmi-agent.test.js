@@ -336,3 +336,53 @@ test("buildRoomInfo carries title, members and optional presenter", () => {
   const info = agent.buildRoomInfo("Movie night", ["Ray", "Aya (in-game)"], "Ray");
   assert.deepEqual(info, { type: "room", title: "Movie night", members: ["Ray", "Aya (in-game)"], presenter: "Ray" });
 });
+
+// ---- session-roster announcement (piggybacked on Kosmi's own chat) ----
+
+test("buildAnnouncement formats a recognizable join line", () => {
+  assert.equal(agent.buildAnnouncement("kaede"), "[WatchAlong] kaede joined");
+});
+
+test("findAnnouncedNames extracts names from surrounding chat text, deduped", () => {
+  const dom = makeDom(
+    "<div>hey everyone</div>" +
+    "<div>[WatchAlong] kaede joined</div>" +
+    "<div>lol hi</div>" +
+    "<div>[WatchAlong] Ray (in-game) joined</div>" +
+    "<div>[WatchAlong] kaede joined</div>"
+  );
+
+  const names = agent.findAnnouncedNames(dom.window.document);
+  assert.deepEqual(names, ["kaede", "Ray (in-game)"]);
+});
+
+test("findAnnouncedNames returns an empty list when no announcement is present", () => {
+  const dom = makeDom("<div>just a normal chat message</div>");
+  assert.deepEqual(agent.findAnnouncedNames(dom.window.document), []);
+});
+
+test("sendChatMessage returns false when the profile has no chat input selector", () => {
+  const dom = makeDom("<div contenteditable='true'></div>");
+  const ok = agent.sendChatMessage(dom.window, dom.window.document, { chat: {} }, "hi");
+  assert.equal(ok, false);
+});
+
+test("sendChatMessage returns false when the input element isn't found", () => {
+  const dom = makeDom("<div>no chat panel open</div>");
+  const ok = agent.sendChatMessage(dom.window, dom.window.document, { chat: { input: "[data-uitag='chat-message-input']" } }, "hi");
+  assert.equal(ok, false);
+});
+
+test("sendChatMessage types the text into the input and submits with Enter", () => {
+  const dom = makeDom("<div contenteditable='true' data-uitag='chat-message-input'></div>");
+  const input = dom.window.document.querySelector("[data-uitag='chat-message-input']");
+
+  let sawEnter = false;
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") sawEnter = true; });
+
+  const ok = agent.sendChatMessage(dom.window, dom.window.document, { chat: { input: "[data-uitag='chat-message-input']" } }, "[WatchAlong] kaede joined");
+
+  assert.equal(ok, true);
+  assert.equal(input.textContent, "[WatchAlong] kaede joined");
+  assert.equal(sawEnter, true);
+});

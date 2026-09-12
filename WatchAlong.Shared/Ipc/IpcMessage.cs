@@ -30,6 +30,7 @@ namespace WatchAlong.Shared.Ipc;
 [JsonDerivedType(typeof(PageStateMessage), "PageState")]
 [JsonDerivedType(typeof(MediaStateMessage), "MediaState")]
 [JsonDerivedType(typeof(RoomInfoMessage), "RoomInfo")]
+[JsonDerivedType(typeof(ChatMemberAnnouncedMessage), "ChatMemberAnnounced")]
 [JsonDerivedType(typeof(AudioStatsMessage), "AudioStats")]
 [JsonDerivedType(typeof(ErrorMessage), "Error")]
 [JsonDerivedType(typeof(LogMessage), "Log")]
@@ -139,6 +140,9 @@ public sealed record MediaStateMessage(
     int[] Rect) : IpcMessage;
 
 public sealed record RoomInfoMessage(string Title, string[] Members, string? Presenter) : IpcMessage;
+
+/// <summary>A WatchAlong join-announcement (`[WatchAlong] &lt;name&gt; joined`) detected in Kosmi's own room chat — the only channel available for one WatchAlong client to learn another's configured display name (group-invites spec).</summary>
+public sealed record ChatMemberAnnouncedMessage(string Name) : IpcMessage;
 
 public sealed record AudioStatsMessage(int Underruns, double LatencyMs) : IpcMessage;
 

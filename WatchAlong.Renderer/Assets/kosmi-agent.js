@@ -118,6 +118,52 @@
     return true;
   }
 
+  // ---- session-roster announcement: piggybacks on Kosmi's own room chat, the only channel
+  // available for one WatchAlong client to learn another's *configured* display name (WatchAlong
+  // joins Kosmi anonymously, so Kosmi's own member list never has it) ----
+
+  var ANNOUNCE_PREFIX = "[WatchAlong] ";
+  var ANNOUNCE_SUFFIX = " joined";
+
+  function buildAnnouncement(name) {
+    return ANNOUNCE_PREFIX + name + ANNOUNCE_SUFFIX;
+  }
+
+  function escapeRegExp(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  var ANNOUNCE_RE = new RegExp(escapeRegExp(ANNOUNCE_PREFIX) + "(.+?)" + escapeRegExp(ANNOUNCE_SUFFIX), "g");
+
+  /** Scans the whole page's text for every "[WatchAlong] <name> joined" line — no chat-message selector needed since the text pattern alone identifies it. */
+  function findAnnouncedNames(doc) {
+    var text = (doc.body && doc.body.textContent) || "";
+    var names = [];
+    var match;
+    ANNOUNCE_RE.lastIndex = 0;
+    while ((match = ANNOUNCE_RE.exec(text)) !== null) {
+      var name = match[1].trim();
+      if (name && names.indexOf(name) === -1) names.push(name);
+    }
+    return names;
+  }
+
+  /** Types text into Kosmi's chat input (a contenteditable, not a plain <input>) and submits with Enter. Returns false if the input isn't found (e.g. chat panel not yet rendered) so the caller can retry. */
+  function sendChatMessage(win, doc, profile, text) {
+    var selector = profile.chat && profile.chat.input;
+    if (!selector) return false;
+
+    var input = doc.querySelector(selector);
+    if (!input) return false;
+
+    input.focus();
+    input.textContent = text;
+    input.dispatchEvent(new win.InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+    input.dispatchEvent(new win.KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
+
+    return true;
+  }
+
   // ---- 5.3: primary-media candidate scoring, with hysteresis ----
 
   function visibleArea(rect, viewportW, viewportH) {
@@ -346,6 +392,9 @@
     buildDomOutline: buildDomOutline,
     setNativeInputValue: setNativeInputValue,
     tryJoinGate: tryJoinGate,
+    buildAnnouncement: buildAnnouncement,
+    findAnnouncedNames: findAnnouncedNames,
+    sendChatMessage: sendChatMessage,
     scoreElement: scoreElement,
     pickBestCandidate: pickBestCandidate,
     PrimarySelector: PrimarySelector,
