@@ -21,7 +21,9 @@ public sealed class ConfigWindow : Window, IDisposable
     private readonly Action _leaveRoom;
     private readonly Action _openPlacement;
     private readonly Action _copyInvite;
+    private readonly Action _toggleFocus;
     private readonly Func<bool> _hasActiveSession;
+    private readonly Func<bool> _hasActiveScreen;
     private readonly Func<IReadOnlyCollection<string>> _getSessionMembers;
 
     private string _displayName;
@@ -37,13 +39,17 @@ public sealed class ConfigWindow : Window, IDisposable
         Action leaveRoom,
         Action openPlacement,
         Action copyInvite,
+        Action toggleFocus,
         Func<bool> hasActiveSession,
+        Func<bool> hasActiveScreen,
         Func<IReadOnlyCollection<string>> getSessionMembers)
         : base("WatchAlong Settings##WatchAlongSettings")
     {
+        // Wide enough that "Place / Move Screen", "Copy Invite", and "Focus on Screen" always
+        // fit their own row without relying solely on ImGuiLayout.SameLineOrWrap's fallback.
         SizeConstraints = new WindowSizeConstraints
         {
-            MinimumSize = new Vector2(320, 200),
+            MinimumSize = new Vector2(440, 260),
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue),
         };
 
@@ -53,7 +59,9 @@ public sealed class ConfigWindow : Window, IDisposable
         _leaveRoom = leaveRoom;
         _openPlacement = openPlacement;
         _copyInvite = copyInvite;
+        _toggleFocus = toggleFocus;
         _hasActiveSession = hasActiveSession;
+        _hasActiveScreen = hasActiveScreen;
         _getSessionMembers = getSessionMembers;
 
         _displayName = configuration.KosmiDisplayName;
@@ -67,9 +75,11 @@ public sealed class ConfigWindow : Window, IDisposable
 
     public override void Draw()
     {
+        using var theme = WatchAlongTheme.Push();
+
         ImGui.TextUnformatted("Identity");
         ImGui.Separator();
-        ImGui.SetNextItemWidth(220);
+        ImGui.SetNextItemWidth(ImGuiLayout.ClampedWidth(220));
         if (ImGui.InputText("Display name", ref _displayName, 40))
         {
             _configuration.KosmiDisplayName = _displayName;
@@ -81,7 +91,7 @@ public sealed class ConfigWindow : Window, IDisposable
         ImGui.Separator();
 
         var changed = false;
-        ImGui.SetNextItemWidth(160);
+        ImGui.SetNextItemWidth(ImGuiLayout.ClampedWidth(160));
         changed |= ImGui.SliderFloat("Volume", ref _volume, 0f, 1.5f);
         changed |= ImGui.Checkbox("Mute", ref _muted);
         if (changed)
@@ -128,11 +138,18 @@ public sealed class ConfigWindow : Window, IDisposable
         if (ImGui.Button("Place / Move Screen"))
             _openPlacement();
 
-        ImGui.SameLine();
+        ImGuiLayout.SameLineOrWrap("Copy Invite");
         using (ImRaii.Disabled(!_hasActiveSession()))
         {
             if (ImGui.Button("Copy Invite"))
                 _copyInvite();
+        }
+
+        ImGuiLayout.SameLineOrWrap("Focus on Screen");
+        using (ImRaii.Disabled(!_hasActiveScreen()))
+        {
+            if (ImGui.Button("Focus on Screen"))
+                _toggleFocus();
         }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 
@@ -12,6 +13,8 @@ namespace WatchAlong.UI;
 /// </summary>
 public sealed class ConfirmationWindow : Window
 {
+    private const float WrapWidth = 380f;
+
     private string _message = "";
     private Action? _onConfirm;
 
@@ -28,7 +31,13 @@ public sealed class ConfirmationWindow : Window
 
     public override void Draw()
     {
+        using var theme = WatchAlongTheme.Push();
+
+        // AlwaysAutoResize otherwise grows this window to fit the message on one line — capped
+        // so a long invite/display name doesn't produce an absurdly wide popup.
+        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + WrapWidth);
         ImGui.TextWrapped(_message);
+        ImGui.PopTextWrapPos();
         ImGui.Separator();
 
         if (ImGui.Button("Confirm"))

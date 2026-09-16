@@ -53,6 +53,8 @@ public sealed class ViewerWindow : Window, IDisposable
 
     public override void Draw()
     {
+        using var theme = WatchAlongTheme.Push();
+
         if (_session.State == KosmiSessionState.Idle)
         {
             DrawStatusMessage("Not connected — open Settings to join a room.");
