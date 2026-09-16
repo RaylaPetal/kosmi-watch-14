@@ -72,4 +72,37 @@ public sealed record ScreenTransform
             Scale = scale ?? new Vector2(3.0f, 1.6875f),
         };
     }
+
+    /// <summary>
+    /// A camera pose (world position, forward direction, up direction) positioned along this
+    /// screen's own <see cref="Forward"/> normal, dead-center and perpendicular to its face, at
+    /// whatever distance makes its full width and height fit <paramref name="verticalFovRadians"/>
+    /// and <paramref name="aspectRatio"/> — the "Focus on screen" framing (screen-focus spec
+    /// "Entering focus frames the screen dead-center"). <paramref name="margin"/> pads the fitted
+    /// distance slightly (1.0 = exactly touching the frame edges) so the screen doesn't sit flush
+    /// against the view boundary.
+    /// </summary>
+    public (Vector3 Position, Vector3 Forward, Vector3 Up) ComputeFocusCameraPose(float verticalFovRadians, float aspectRatio, float margin = 1.05f)
+    {
+        var halfW = Scale.X * 0.5f;
+        var halfH = Scale.Y * 0.5f;
+        var halfFovY = verticalFovRadians * 0.5f;
+        var halfFovX = MathF.Atan(MathF.Tan(halfFovY) * aspectRatio);
+
+        var distanceForHeight = halfH / MathF.Tan(halfFovY);
+        var distanceForWidth = halfW / MathF.Tan(halfFovX);
+        var distance = MathF.Max(distanceForHeight, distanceForWidth) * margin;
+
+        // Verified empirically against PlaceLookingAt: for a screen placed to face a point P,
+        // Forward comes out pointing AWAY from P, not toward it — so the viewable side (where a
+        // player would actually stand to read the screen un-mirrored) is -Forward, not +Forward.
+        // The camera sits on that viewable side and looks back across the gap, i.e. in the
+        // +Forward direction.
+        var screenForward = Forward;
+        var position = Position - screenForward * distance;
+        var forward = screenForward;
+        var up = Vector3.TransformNormal(Vector3.UnitY, RotationMatrix);
+
+        return (position, forward, up);
+    }
 }
