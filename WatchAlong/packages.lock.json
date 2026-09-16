@@ -14,6 +14,12 @@
         "resolved": "1.2.39",
         "contentHash": "fcFN01tDTIQqDuTwr1jUQK/geofiwjG5DycJQOnC72i1SsLAk1ELe+apBOuZ11UMQG8YKFZG1FgvjZPbqHyatg=="
       },
+      "ECommons": {
+        "type": "Direct",
+        "requested": "[3.2.1.18, )",
+        "resolved": "3.2.1.18",
+        "contentHash": "7yudYdKsg6TMki8+vekCbnOf4JdG/JFAcMFzMC77uv8E9WF87Cln6TL+OvFYUbqatfyFiMwXwJOEs/P7LcCjPQ=="
+      },
       "TerraFX.Interop.Windows": {
         "type": "Direct",
         "requested": "[10.0.26100.6, )",

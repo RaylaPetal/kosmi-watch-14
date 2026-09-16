@@ -22,7 +22,6 @@ namespace WatchAlong.Shared.Ipc;
 [JsonDerivedType(typeof(SetProfileMessage), "SetProfile")]
 [JsonDerivedType(typeof(SetAnchorMessage), "SetAnchor")]
 [JsonDerivedType(typeof(ClearAnchorMessage), "ClearAnchor")]
-[JsonDerivedType(typeof(SetRenderModeMessage), "SetRenderMode")]
 [JsonDerivedType(typeof(ReloadMessage), "Reload")]
 [JsonDerivedType(typeof(DebugSnapshotMessage), "DebugSnapshot")]
 [JsonDerivedType(typeof(ShutdownMessage), "Shutdown")]
@@ -30,7 +29,6 @@ namespace WatchAlong.Shared.Ipc;
 [JsonDerivedType(typeof(PageStateMessage), "PageState")]
 [JsonDerivedType(typeof(MediaStateMessage), "MediaState")]
 [JsonDerivedType(typeof(RoomInfoMessage), "RoomInfo")]
-[JsonDerivedType(typeof(ChatMemberAnnouncedMessage), "ChatMemberAnnounced")]
 [JsonDerivedType(typeof(AudioStatsMessage), "AudioStats")]
 [JsonDerivedType(typeof(ErrorMessage), "Error")]
 [JsonDerivedType(typeof(LogMessage), "Log")]
@@ -41,9 +39,6 @@ public enum ViewMode { Theater, Full }
 public enum VoiceMode { Off, Flat }
 
 public enum InputKind { MouseMove, MouseButton, Wheel, Key, Text }
-
-/// <summary>Non-occluded world-space quad (Phase 2a) vs. depth-tested, occluded rendering (Phase 2b).</summary>
-public enum ScreenRenderMode { Quad, DepthTested }
 
 public sealed record CodecSupport(bool H264, bool Aac, bool Vp9, bool Av1);
 
@@ -88,9 +83,6 @@ public sealed record SetAnchorMessage(
 
 /// <summary>Removes a placed screen's world transform; the session's audio and rendering fall back to flat/viewer-window behavior.</summary>
 public sealed record ClearAnchorMessage : IpcMessage;
-
-/// <summary>Switches a placed screen between the non-occluded quad and the depth-tested renderer.</summary>
-public sealed record SetRenderModeMessage(ScreenRenderMode Mode) : IpcMessage;
 
 public sealed record SetVoiceModeMessage(VoiceMode Mode) : IpcMessage;
 
@@ -140,9 +132,6 @@ public sealed record MediaStateMessage(
     int[] Rect) : IpcMessage;
 
 public sealed record RoomInfoMessage(string Title, string[] Members, string? Presenter) : IpcMessage;
-
-/// <summary>A WatchAlong join-announcement (`[WatchAlong] &lt;name&gt; joined`) detected in Kosmi's own room chat — the only channel available for one WatchAlong client to learn another's configured display name (group-invites spec).</summary>
-public sealed record ChatMemberAnnouncedMessage(string Name) : IpcMessage;
 
 public sealed record AudioStatsMessage(int Underruns, double LatencyMs) : IpcMessage;
 

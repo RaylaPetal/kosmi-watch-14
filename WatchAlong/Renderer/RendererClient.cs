@@ -23,7 +23,6 @@ public sealed class RendererClient : IAsyncDisposable
     private IpcPipe? _pipe;
 
     public event Action<FrameRingInfoMessage>? FrameRingAnnounced;
-    public event Action<ChatMemberAnnouncedMessage>? ChatMemberAnnounced;
     public event Action<string>? Log;
 
     public RendererClient(KosmiSessionController sessionController, RendererWatchdog watchdog)
@@ -81,8 +80,6 @@ public sealed class RendererClient : IAsyncDisposable
 
                 if (message is FrameRingInfoMessage frameRingInfo)
                     FrameRingAnnounced?.Invoke(frameRingInfo);
-                else if (message is ChatMemberAnnouncedMessage chatMember)
-                    ChatMemberAnnounced?.Invoke(chatMember);
                 else
                     _sessionController.HandleRendererMessage(message);
             }

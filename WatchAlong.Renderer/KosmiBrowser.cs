@@ -38,9 +38,6 @@ public sealed class KosmiBrowser : IDisposable
     /// <summary>Primary-media state reported by kosmi-agent.js (design.md §6.4 jobs 3/5).</summary>
     public event Action<MediaStateMessage>? MediaStateChanged;
 
-    /// <summary>A WatchAlong join-announcement detected in Kosmi's own room chat (group-invites spec).</summary>
-    public event Action<string>? ChatMemberAnnounced;
-
     public KosmiBrowser(string safeRoomUrl, string displayName, string frameMapName, ushort frameSlotCount, int maxWidth, int maxHeight)
     {
         _displayName = displayName;
@@ -204,12 +201,6 @@ public sealed class KosmiBrowser : IDisposable
                         (int?)payload["error"]?.GetValue<double?>(),
                         rect));
                     break;
-
-                case "member":
-                    var name = payload["name"]?.GetValue<string>();
-                    if (!string.IsNullOrWhiteSpace(name))
-                        ChatMemberAnnounced?.Invoke(name);
-                    break;
             }
         }
         catch (Exception ex)
@@ -234,8 +225,6 @@ public sealed class KosmiBrowser : IDisposable
       var lastPageState = null;
       var primary = new agent.PrimarySelector();
       var lastAppliedPrimary = null;
-      var selfAnnounced = false;
-      var seenAnnouncedNames = {};
 
       function post(payload) {
         try { CefSharp.PostMessage(JSON.stringify(payload)); } catch (e) {}
@@ -253,20 +242,6 @@ public sealed class KosmiBrowser : IDisposable
         }
 
         if (state === 'InRoom') {
-          // Retries every tick until the chat panel/input actually exists in the DOM.
-          if (!selfAnnounced) {
-            selfAnnounced = agent.sendChatMessage(window, document, profile, agent.buildAnnouncement(displayName));
-          }
-
-          var announced = agent.findAnnouncedNames(document);
-          for (var i = 0; i < announced.length; i++) {
-            var name = announced[i];
-            if (name !== displayName && !seenAnnouncedNames[name]) {
-              seenAnnouncedNames[name] = true;
-              post({ type: 'member', name: name });
-            }
-          }
-
           var candidate = agent.pickBestCandidate(document, profile, window.innerWidth, window.innerHeight);
           var current = primary.consider(candidate, Date.now());
 

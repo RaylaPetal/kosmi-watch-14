@@ -16,7 +16,7 @@ Commands:
 /wa invite - copy a shareable invite for your current room and screen
 /wa sync &lt;WA1P: message&gt; - apply a shared screen position (with confirmation)
 /wa place - open the screen placement window
-/wa depth - toggle quad vs. depth-tested screen rendering
+/wa focus - snap the camera to a fullscreen view of your placed screen (move to exit)
 /wa vol &lt;0-150&gt; - set volume
 /wa mute - toggle mute
 /wa snapshot - save a debug screenshot + DOM outline</Description>
@@ -43,6 +43,11 @@ Commands:
     <PackageReference Include="Vortice.DXGI" Version="3.8.3" />
     <PackageReference Include="Vortice.D3DCompiler" Version="3.8.3" />
     <PackageReference Include="Vortice.Mathematics" Version="2.1.1" />
+    <!-- Community-vetted Chat.SendMessage (ECommons.Automation) is the tell-relay roster's only
+         way to actually send an outgoing /tell — Dalamud's own IChatGui is read/local-print only
+         by design, so this uses the signature ECommons already resolves and maintains rather than
+         a hand-rolled, unverified one. -->
+    <PackageReference Include="ECommons" Version="3.2.1.18" />
   </ItemGroup>
 
   <!-- Ships WatchAlong.Renderer.exe (and its dependencies) next to the plugin DLL, so

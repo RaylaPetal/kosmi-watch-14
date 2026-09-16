@@ -1,11 +1,10 @@
 // Ported from Sebane1/XivMediaPlayer (AGPL-3.0) — XivMediaPlayer/Compositing/WorldVideoRenderer.
-// The ImGui screen-space path (RenderScreenSpace/WorldToScreenClamped) is Phase 2a: no depth
-// testing, no glow/vignette/screensaver/loading-overlay state — those are VLC-player-specific or
-// belong to the Phase 2b depth-tested capability. The depth-tested path (RenderWithOcclusion)
-// wires the ported Screens/Ported/DepthTested/ unit (design.md Appendix C: "port as one unit").
-// An earlier attempt at this path used a hand-reconstructed camera basis and rendered fully
-// transparent; CameraInfo.TryGetCameraBasis() now derives it the same way XivMediaPlayer's own
-// working code does (invert the render camera's view matrix), which this depends on.
+// The depth-tested path (RenderWithOcclusion) wires the ported Screens/Ported/DepthTested/ unit
+// (design.md Appendix C: "port as one unit"). An earlier attempt at this path used a
+// hand-reconstructed camera basis and rendered fully transparent; CameraInfo.TryGetCameraBasis()
+// now derives it the same way XivMediaPlayer's own working code does (invert the render camera's
+// view matrix), which this depends on. The original non-occluded ImGui-quad path (Phase 2a) has
+// been removed now that depth-tested rendering is verified against a live game and always used.
 using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
@@ -13,41 +12,29 @@ using Dalamud.Plugin.Services;
 using WatchAlong.Core;
 using WatchAlong.Screens.Ported.DepthTested;
 using WatchAlong.Shared.Frames;
-using WatchAlong.Shared.Ipc;
 using WatchAlong.Shared.Screens;
 
 namespace WatchAlong.Screens.Ported;
 
 /// <summary>
-/// Draws a placed screen's current video texture as a 3D object in world space: either a
-/// non-occluded ImGui quad (Phase 2a, world-screens spec) or, once switched via
-/// <see cref="ScreenRenderMode.DepthTested"/>, a per-pixel depth-occluded composite that also
-/// draws game UI back over the screen (Phase 2b, depth-tested-rendering spec).
+/// Draws a placed screen's current video texture as a 3D object in world space: a per-pixel
+/// depth-occluded composite that also draws game UI back over the screen
+/// (depth-tested-rendering spec).
 /// </summary>
 public sealed class WorldVideoRenderer(IGameGui gameGui) : IDisposable
 {
-    private const int QuadGridSubdivisions = 8;
-
     private DepthBufferCapture? _depthCapture;
     private UILayerCapture? _uiCapture;
     private DepthTestedRenderer? _depthRenderer;
     private GlowRenderer? _glowRenderer;
     private string? _lastInitError;
 
-    /// <summary>Non-null when the depth-tested path failed to initialize (e.g. shader compile failure) — the caller should fall back to the quad and can surface this for diagnostics.</summary>
+    /// <summary>Non-null when the depth-tested path failed to initialize (e.g. shader compile failure) or a frame's render call didn't produce output — surfaced for diagnostics; the screen simply doesn't draw that frame.</summary>
     public string? DepthRendererError => _lastInitError;
 
-    /// <summary>
-    /// Call once per frame, before any ImGui rendering (matches the ported
-    /// <c>DepthBufferCapture.BeginFrame</c>/<c>UILayerCapture.CaptureFrame</c> contract). A no-op
-    /// in <see cref="ScreenRenderMode.Quad"/> mode — the CPU/GPU cost of depth+UI capture is only
-    /// paid when a screen is actually depth-tested.
-    /// </summary>
-    public void BeginFrame(ScreenRenderMode mode)
+    /// <summary>Call once per frame, before any ImGui rendering (matches the ported <c>DepthBufferCapture.BeginFrame</c>/<c>UILayerCapture.CaptureFrame</c> contract).</summary>
+    public void BeginFrame()
     {
-        if (mode != ScreenRenderMode.DepthTested)
-            return;
-
         EnsureDepthTestedResources();
         if (_depthCapture is { } depth)
         {
@@ -58,18 +45,17 @@ public sealed class WorldVideoRenderer(IGameGui gameGui) : IDisposable
     }
 
     /// <summary>
-    /// Renders <paramref name="transform"/>'s quad textured with <paramref name="textureSrv"/>
-    /// (a <see cref="Direct3D11VideoTexture"/>'s SRV) cropped to <paramref name="contentUv"/>.
+    /// Renders <paramref name="transform"/>'s screen, depth-occluded, textured with
+    /// <paramref name="textureSrv"/> (a <see cref="Direct3D11VideoTexture"/>'s SRV) cropped to
+    /// <paramref name="contentUv"/>. Does nothing this frame if the depth-tested renderer, camera
+    /// basis, or captured depth/UI data aren't ready yet (see <see cref="DepthRendererError"/>).
     /// </summary>
-    public void Render(ScreenTransform transform, nint textureSrv, ContentUv contentUv, ScreenRenderMode mode)
+    public void Render(ScreenTransform transform, nint textureSrv, ContentUv contentUv)
     {
         if (textureSrv == nint.Zero)
             return;
 
-        if (mode == ScreenRenderMode.DepthTested && RenderWithOcclusion(transform, textureSrv, contentUv))
-            return;
-
-        RenderScreenSpace(transform, textureSrv, contentUv);
+        RenderWithOcclusion(transform, textureSrv, contentUv);
     }
 
     /// <summary>No-active-media placeholder (world-screens spec "No active content on a placed screen"): a dim panel with a waiting message instead of the last frame or a blank quad.</summary>
@@ -89,65 +75,6 @@ public sealed class WorldVideoRenderer(IGameGui gameGui) : IDisposable
         var center = (sTl + sTr + sBr + sBl) / 4f;
         var textSize = ImGui.CalcTextSize(message);
         drawList.AddText(center - textSize / 2f, 0xFFFFFFFF, message);
-    }
-
-    /// <summary>
-    /// Non-occluded quad, subdivided into a grid rather than one <c>AddImageQuad</c> call: ImGui
-    /// splits a quad into two triangles and interpolates UVs affinely (not perspective-correct)
-    /// per triangle, which shows up as visible warping/twisting along the diagonal seam at a
-    /// steep viewing angle. Subdividing shrinks the perspective range (and so the error) each
-    /// individual affine interpolation covers, hiding the artifact almost entirely. Does nothing
-    /// if any corner can't be projected to screen space (behind the camera).
-    /// </summary>
-    private void RenderScreenSpace(ScreenTransform transform, nint textureSrv, ContentUv contentUv)
-    {
-        var (tl, tr, br, bl) = transform.Corners;
-
-        if (!gameGui.WorldToScreen(tl, out _) ||
-            !gameGui.WorldToScreen(tr, out _) ||
-            !gameGui.WorldToScreen(br, out _) ||
-            !gameGui.WorldToScreen(bl, out _))
-            return;
-
-        var drawList = ImGui.GetBackgroundDrawList(ImGui.GetMainViewport());
-        var textureId = new ImTextureID(textureSrv);
-
-        const int grid = QuadGridSubdivisions;
-        for (var row = 0; row < grid; row++)
-        {
-            var v0 = (float)row / grid;
-            var v1 = (float)(row + 1) / grid;
-            for (var col = 0; col < grid; col++)
-            {
-                var u0 = (float)col / grid;
-                var u1 = (float)(col + 1) / grid;
-
-                var cellTl = Bilerp(tl, tr, bl, br, u0, v0);
-                var cellTr = Bilerp(tl, tr, bl, br, u1, v0);
-                var cellBr = Bilerp(tl, tr, bl, br, u1, v1);
-                var cellBl = Bilerp(tl, tr, bl, br, u0, v1);
-
-                if (!gameGui.WorldToScreen(cellTl, out var sTl) ||
-                    !gameGui.WorldToScreen(cellTr, out var sTr) ||
-                    !gameGui.WorldToScreen(cellBr, out var sBr) ||
-                    !gameGui.WorldToScreen(cellBl, out var sBl))
-                    continue;
-
-                var uvU0 = contentUv.MinU + (contentUv.MaxU - contentUv.MinU) * u0;
-                var uvU1 = contentUv.MinU + (contentUv.MaxU - contentUv.MinU) * u1;
-                var uvV0 = contentUv.MinV + (contentUv.MaxV - contentUv.MinV) * v0;
-                var uvV1 = contentUv.MinV + (contentUv.MaxV - contentUv.MinV) * v1;
-
-                drawList.AddImageQuad(
-                    textureId,
-                    sTl, sTr, sBr, sBl,
-                    new Vector2(uvU0, uvV0),
-                    new Vector2(uvU1, uvV0),
-                    new Vector2(uvU1, uvV1),
-                    new Vector2(uvU0, uvV1),
-                    0xFFFFFFFF);
-            }
-        }
     }
 
     private void EnsureDepthTestedResources()
@@ -258,13 +185,6 @@ public sealed class WorldVideoRenderer(IGameGui gameGui) : IDisposable
         var outputId = new ImTextureID(outputSrv.NativePointer);
         drawList.AddImage(outputId, viewport.Pos, viewport.Pos + viewport.Size);
         return true;
-    }
-
-    private static Vector3 Bilerp(Vector3 topLeft, Vector3 topRight, Vector3 bottomLeft, Vector3 bottomRight, float u, float v)
-    {
-        var top = Vector3.Lerp(topLeft, topRight, u);
-        var bottom = Vector3.Lerp(bottomLeft, bottomRight, u);
-        return Vector3.Lerp(top, bottom, v);
     }
 
     public void Dispose()

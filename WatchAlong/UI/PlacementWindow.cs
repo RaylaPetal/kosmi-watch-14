@@ -3,7 +3,6 @@ using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using WatchAlong.Shared.Invites;
-using WatchAlong.Shared.Ipc;
 using WatchAlong.Shared.Screens;
 
 namespace WatchAlong.UI;
@@ -26,7 +25,6 @@ public sealed class PlacementWindow : Window
     private readonly Action _onCancel;
     private readonly Func<string> _getDisplayName;
     private readonly Action<string> _copyToClipboard;
-    private readonly Func<ScreenRenderMode> _getRenderMode;
 
     private ScreenTransform? _editing;
 
@@ -36,17 +34,23 @@ public sealed class PlacementWindow : Window
         Action onCommit,
         Action onCancel,
         Func<string> getDisplayName,
-        Action<string> copyToClipboard,
-        Func<ScreenRenderMode> getRenderMode)
+        Action<string> copyToClipboard)
         : base("WatchAlong Screen Placement##WatchAlongPlacement")
     {
+        // Wide enough for the confirm/cancel/remove button row without relying solely on
+        // ImGuiLayout.SameLineOrWrap's fallback; tall enough for every field plus that row.
+        SizeConstraints = new WindowSizeConstraints
+        {
+            MinimumSize = new Vector2(420, 260),
+            MaximumSize = new Vector2(float.MaxValue, float.MaxValue),
+        };
+
         _screenController = screenController;
         _getPlayerFacing = getPlayerFacing;
         _onCommit = onCommit;
         _onCancel = onCancel;
         _getDisplayName = getDisplayName;
         _copyToClipboard = copyToClipboard;
-        _getRenderMode = getRenderMode;
     }
 
     /// <summary>True while the gizmo owns input — <c>InputRouter</c>/control mode should not also receive it (design.md D6).</summary>
@@ -67,6 +71,8 @@ public sealed class PlacementWindow : Window
         if (_editing is not { } transform)
             return;
 
+        using var theme = WatchAlongTheme.Push();
+
         var changed = false;
         var position = transform.Position;
         var rotation = transform.RotationDegrees;
@@ -79,9 +85,9 @@ public sealed class PlacementWindow : Window
         changed |= ImGui.DragFloat3("##Rotation", ref rotation, 0.5f);
 
         // Locked to Kosmi's fixed 1920x1080 output (see WorldVideoRenderer's contentAspect comment)
-        // rather than a free width/height drag — an off-ratio screen either gets letterboxed by the
-        // depth-tested shader's own aspect correction or visibly stretched in quad mode; a single
-        // size control that always derives height from width avoids either happening by construction.
+        // rather than a free width/height drag — an off-ratio screen gets letterboxed by the
+        // depth-tested shader's own aspect correction; a single size control that always derives
+        // height from width avoids that being visibly stretched by construction.
         ImGui.TextUnformatted("Width (yalms, 16:9 height follows)");
         var width = scale.X;
         if (ImGui.DragFloat("##Width", ref width, 0.02f, 0.2f, 20f))
@@ -104,7 +110,7 @@ public sealed class PlacementWindow : Window
             _screenController.Preview(_editing);
         }
 
-        ImGui.SameLine();
+        ImGuiLayout.SameLineOrWrap("Confirm");
         if (ImGui.Button("Confirm"))
         {
             _screenController.Commit();
@@ -112,7 +118,7 @@ public sealed class PlacementWindow : Window
             IsOpen = false;
         }
 
-        ImGui.SameLine();
+        ImGuiLayout.SameLineOrWrap("Cancel");
         if (ImGui.Button("Cancel"))
         {
             _screenController.Cancel();
@@ -120,7 +126,7 @@ public sealed class PlacementWindow : Window
             IsOpen = false;
         }
 
-        ImGui.SameLine();
+        ImGuiLayout.SameLineOrWrap("Remove screen");
         if (ImGui.Button("Remove screen"))
         {
             _screenController.Remove();
@@ -132,7 +138,7 @@ public sealed class PlacementWindow : Window
         // does not trigger a share on its own": only this explicit button ever encodes/copies a
         // share message — dragging, resizing, or rotating above never does.
         if (_screenController.ActiveAnchor is { } activeAnchor && ImGui.Button("Share position"))
-            _copyToClipboard(InviteCodec.EncodePositionShare(_getDisplayName(), activeAnchor, _getRenderMode()));
+            _copyToClipboard(InviteCodec.EncodePositionShare(_getDisplayName(), activeAnchor));
     }
 
     private ScreenTransform PlaceInFrontOfPlayer()

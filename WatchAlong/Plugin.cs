@@ -2,12 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
+using ECommons;
+// Aliased: WatchAlong already has a sibling namespace WatchAlong.Chat (InviteChatDetector,
+// TellRosterListener) that shadows the unqualified ECommons.Automation.Chat class name.
+using EcChat = ECommons.Automation.Chat;
 using Dalamud.Game.Command;
 using Dalamud.Game.Config;
 using Dalamud.IoC;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using WatchAlong.Camera;
 using WatchAlong.Chat;
 using WatchAlong.Core;
 using WatchAlong.Renderer;
@@ -37,6 +42,8 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
     [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
+    [PluginService] internal static ISigScanner SigScanner { get; private set; } = null!;
+    [PluginService] internal static IGameInteropProvider GameInteropProvider { get; private set; } = null!;
 
     public Configuration Configuration { get; }
 
@@ -61,6 +68,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly PlacementWindow _placementWindow;
     private readonly ConfirmationWindow _confirmationWindow = new();
     private readonly InviteChatDetector _inviteChatDetector;
+    private readonly TellRosterListener _tellRosterListener;
+    private readonly ScreenFocusService _screenFocus;
 
     private FrameReader? _frameReader;
     // _frameReader is disposed/replaced from OnFrameRingAnnounced, which fires on RendererClient's
@@ -74,6 +83,11 @@ public sealed class Plugin : IDalamudPlugin
     public Plugin()
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+
+        // Only dependency so far that needs it: Chat.SendMessage (tell-relay roster's outgoing
+        // /tell) resolves its native signature lazily through ECommons' own service container,
+        // which this populates.
+        ECommonsMain.Init(PluginInterface, this);
 
         var isWine = WineDetect.IsRunningUnderWine();
         var dependencyDir = Path.Combine(PluginInterface.ConfigDirectory.FullName, "Dependencies");
@@ -139,7 +153,6 @@ public sealed class Plugin : IDalamudPlugin
         _sessionController.RendererSpawnFailed += ex => Log.Error(ex, "WatchAlong: failed to start the renderer process.");
         _rendererClient = new RendererClient(_sessionController, _watchdog);
         _rendererClient.FrameRingAnnounced += OnFrameRingAnnounced;
-        _rendererClient.ChatMemberAnnounced += announced => _sessionMembers.Add(announced.Name);
         _rendererClient.Log += msg => Log.Information(msg);
 
         _supervisor.SendOpenRoom += msg => _rendererClient.SendAsync(msg).ConfigureAwait(false);
@@ -153,7 +166,7 @@ public sealed class Plugin : IDalamudPlugin
             _texture,
             msg => _rendererClient.SendAsync(msg).ConfigureAwait(false),
             openSettings: () => _configWindow.IsOpen = true);
-        _diagnosticsWindow = new DiagnosticsWindow(_rendererProcess, _watchdog, _sessionController.Session, WipeAndRedownload);
+        _diagnosticsWindow = new DiagnosticsWindow(_rendererProcess, _watchdog, _sessionController.Session, WipeAndRedownload, () => _worldVideoRenderer.DepthRendererError);
 
         // World screens / spatial audio (Phase 2, design.md D1/D3/D5). A screen is drawn and its
         // audio scaled entirely in this process (game device, game camera) — WatchAlong.Renderer
@@ -162,6 +175,7 @@ public sealed class Plugin : IDalamudPlugin
         _locationService = new LocationService(ClientState, ObjectTable, Framework);
         var anchorDir = Path.Combine(PluginInterface.ConfigDirectory.FullName, "screens");
         _screenController = new ScreenController(_locationService, new AnchorStore(anchorDir));
+        _screenFocus = new ScreenFocusService(_screenController);
         _worldVideoRenderer = new WorldVideoRenderer(GameGui);
         _bgmDucker = new BgmDucker(
             () => { GameConfig.TryGet(SystemConfigOption.SoundBgm, out uint v); return v; },
@@ -182,8 +196,7 @@ public sealed class Plugin : IDalamudPlugin
             onCommit: () => { },
             onCancel: () => { },
             getDisplayName: () => Configuration.KosmiDisplayName,
-            copyToClipboard: CopyToClipboard,
-            getRenderMode: () => Configuration.ScreenRenderMode);
+            copyToClipboard: CopyToClipboard);
 
         // No more control-mode split (the video window handles input directly, see
         // ViewerWindow) — every other session action lives in one settings window instead of
@@ -195,11 +208,13 @@ public sealed class Plugin : IDalamudPlugin
             CloseRoom,
             openPlacement: () => _placementWindow.IsOpen = true,
             copyInvite: CopyInvite,
+            toggleFocus: _screenFocus.Toggle,
             // CurrentRoomCode (not Session.State != Idle) is the "did the user actually ask to
             // join something" signal — it's only ever set by a successful TryOpenRoom and
             // cleared by CloseRoom, so it can't show a stray "Leave Room" button before anyone
             // has joined anything.
             hasActiveSession: () => _sessionController.CurrentRoomCode is not null,
+            hasActiveScreen: () => _screenController.ActiveAnchor is not null,
             getSessionMembers: () => _sessionMembers);
 
         // Groups (Phase 3a, design.md §9.3): a chat-detected WA1:/WA1P: token becomes a
@@ -207,6 +222,13 @@ public sealed class Plugin : IDalamudPlugin
         // commands use (group-invites spec "Joining an invite always requires explicit
         // confirmation").
         _inviteChatDetector = new InviteChatDetector(ChatGui, ShowJoinConfirmation, ShowSyncConfirmation);
+
+        // Tell-relay session roster: Kosmi's own room chat can't carry a join announcement
+        // (WatchAlong joins Kosmi anonymously, so its member list never has a real display name,
+        // and there's no reliable way to actually submit a message into Kosmi's own chat UI from
+        // here). Instead, accepting an invite tells its sender directly (see ShowJoinConfirmation);
+        // this listens for that tell on the sender's side to populate their own roster.
+        _tellRosterListener = new TellRosterListener(ChatGui, name => _sessionMembers.Add(name));
 
         // viewer-playback spec "Placement removed": revert to flat audio the moment the anchor
         // goes away, rather than waiting for the next 50ms spatial-audio tick.
@@ -222,7 +244,7 @@ public sealed class Plugin : IDalamudPlugin
         _windowSystem.AddWindow(_placementWindow);
         _windowSystem.AddWindow(_confirmationWindow);
 
-        CommandManager.AddHandler("/wa", new CommandInfo(OnCommand) { HelpMessage = "Toggle the WatchAlong viewer, or run a subcommand (join/invite/sync/settings/place/depth/vol/mute/snapshot)." });
+        CommandManager.AddHandler("/wa", new CommandInfo(OnCommand) { HelpMessage = "Toggle the WatchAlong viewer, or run a subcommand (join/invite/sync/settings/place/focus/vol/mute/snapshot)." });
 
         PluginInterface.UiBuilder.Draw += OnDraw;
         PluginInterface.UiBuilder.OpenMainUi += OnOpenMainUi;
@@ -240,6 +262,8 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenConfigUi -= OnOpenConfigUi;
         CommandManager.RemoveHandler("/wa");
         _inviteChatDetector.Dispose();
+        _tellRosterListener.Dispose();
+        _screenFocus.Dispose();
 
         // design.md D5: every lifecycle exit that can end a duck restores BGM explicitly — never
         // rely on a timer/finalizer to un-duck the player's music.
@@ -254,6 +278,7 @@ public sealed class Plugin : IDalamudPlugin
             _frameReader?.Dispose();
         _texture.Dispose();
         _rendererProcess.Dispose();
+        ECommonsMain.Dispose();
     }
 
     private void OnFrameworkUpdate(IFramework framework)
@@ -284,6 +309,8 @@ public sealed class Plugin : IDalamudPlugin
         var playerPos = CameraInfo.GetPlayerPosition(ObjectTable);
         var isMediaActive = _sessionController.Session.State == KosmiSessionState.InRoomPlaying;
         _spatialAudio.Tick(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), cameraPos, cameraForward, playerPos, isMediaActive);
+
+        _screenFocus.Tick((float)framework.UpdateDelta.TotalSeconds);
     }
 
     private void OnDraw()
@@ -295,7 +322,7 @@ public sealed class Plugin : IDalamudPlugin
         // frame, per DepthBufferCapture/UILayerCapture's "call at the very start of OnDraw"
         // contract — a no-op unless a screen is both placed, visible, and in depth-tested mode.
         if (showPlacedScreen)
-            _worldVideoRenderer.BeginFrame(Configuration.ScreenRenderMode);
+            _worldVideoRenderer.BeginFrame();
 
         lock (_frameReaderLock)
         {
@@ -309,7 +336,7 @@ public sealed class Plugin : IDalamudPlugin
             // when there's no active media (mirrors ViewerWindow's own no-media state).
             if (_texture.HasTexture && _sessionController.Session.State == KosmiSessionState.InRoomPlaying)
             {
-                _worldVideoRenderer.Render(anchor.Transform, _texture.ShaderResourceView, _texture.ContentUv, Configuration.ScreenRenderMode);
+                _worldVideoRenderer.Render(anchor.Transform, _texture.ShaderResourceView, _texture.ContentUv);
             }
             else
             {
@@ -445,8 +472,15 @@ public sealed class Plugin : IDalamudPlugin
         Log.Information("WatchAlong: invite copied to clipboard.");
     }
 
-    /// <summary>group-invites spec "Joining an invite always requires explicit confirmation" — the one path both a clicked chat link and a typed <c>/wa join</c> invite route through (tasks.md 3.3, 4.2, 4.3).</summary>
-    private void ShowJoinConfirmation(DecodedInvite invite)
+    /// <summary>
+    /// group-invites spec "Joining an invite always requires explicit confirmation" — the one
+    /// path both a clicked chat link and a typed <c>/wa join</c> invite route through (tasks.md
+    /// 3.3, 4.2, 4.3). <paramref name="senderCharacterName"/> is the FFXIV character who posted
+    /// the invite in chat (null for a typed <c>/wa join</c>, which has no chat line to attribute)
+    /// — on success it's told directly so their own client learns we joined (tell-relay roster;
+    /// see <see cref="TellRosterListener"/>).
+    /// </summary>
+    private void ShowJoinConfirmation(DecodedInvite invite, string? senderCharacterName = null)
     {
         _confirmationWindow.Show(
             $"Join Kosmi room '{invite.Name}'? You'll appear there as '{Configuration.KosmiDisplayName}'.",
@@ -459,7 +493,24 @@ public sealed class Plugin : IDalamudPlugin
                 if (invite.Anchor is not null)
                     _screenController.ApplyExternalAnchor(invite.Anchor);
                 _sessionMembers.Add(invite.Name);
+
+                if (senderCharacterName is not null)
+                    AnnounceJoinTo(senderCharacterName);
             });
+    }
+
+    /// <summary>Tells <paramref name="characterName"/> that we accepted their invite, so the tell-relay roster listener on their end can add us (see <see cref="TellRosterListener"/>). Best-effort: a failure here (e.g. a stale/unresolvable signature) only costs that one roster entry, never the join itself.</summary>
+    private void AnnounceJoinTo(string characterName)
+    {
+        var displayName = string.IsNullOrWhiteSpace(Configuration.KosmiDisplayName) ? "Watch-along" : Configuration.KosmiDisplayName;
+        try
+        {
+            EcChat.SendMessage($"/tell {characterName} {RosterAnnouncement.Build(displayName)}");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, $"WatchAlong: failed to send the join tell to {characterName}.");
+        }
     }
 
     /// <summary>group-invites spec "Confirming a position sync applies the anchor without touching the room" — never opens/closes a room (tasks.md 3.3, 6.3).</summary>
@@ -470,8 +521,6 @@ public sealed class Plugin : IDalamudPlugin
             () =>
             {
                 _screenController.ApplyExternalAnchor(share.Anchor);
-                Configuration.ScreenRenderMode = share.RenderMode;
-                Configuration.Save();
                 _sessionMembers.Add(share.Name);
             });
     }
@@ -524,13 +573,9 @@ public sealed class Plugin : IDalamudPlugin
                 _placementWindow.IsOpen = true;
                 break;
 
-            case "depth":
-                Configuration.ScreenRenderMode = Configuration.ScreenRenderMode == ScreenRenderMode.Quad
-                    ? ScreenRenderMode.DepthTested
-                    : ScreenRenderMode.Quad;
-                Configuration.Save();
-                Log.Information($"WatchAlong: screen render mode set to {Configuration.ScreenRenderMode}."
-                    + (_worldVideoRenderer.DepthRendererError is { } err ? $" (last error: {err})" : ""));
+            case "focus":
+                _screenFocus.Toggle();
+                Log.Information($"WatchAlong: {_screenFocus.Status}");
                 break;
 
             case "vol" when parts.Length > 1 && float.TryParse(parts[1], out var vol):

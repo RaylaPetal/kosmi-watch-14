@@ -26,8 +26,6 @@ public class IpcMessageRoundTripTests
         yield return [new SetProfileMessage("""{"schema":1}""")];
         yield return [new SetAnchorMessage(0.5, 1.2, -3.0, 90, 0, 0, 3.0, 1.6875)];
         yield return [new ClearAnchorMessage()];
-        yield return [new SetRenderModeMessage(ScreenRenderMode.Quad)];
-        yield return [new SetRenderModeMessage(ScreenRenderMode.DepthTested)];
         yield return [new ReloadMessage()];
         yield return [new DebugSnapshotMessage()];
         yield return [new ShutdownMessage()];

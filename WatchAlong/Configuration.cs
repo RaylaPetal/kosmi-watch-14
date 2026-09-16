@@ -43,9 +43,6 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>"Show screens in GPose" — off by default (depth-tested-rendering spec).</summary>
     public bool ShowScreensInGPose { get; set; } = false;
 
-    /// <summary>Non-occluded quad (Phase 2a) vs. depth-tested, occluded rendering (Phase 2b). Default: depth-tested, now verified against a live game.</summary>
-    public ScreenRenderMode ScreenRenderMode { get; set; } = ScreenRenderMode.DepthTested;
-
     // Debug
     public int CefRemoteDebugPort { get; set; } = 0;
     public bool VerboseRendererLog { get; set; } = false;
