@@ -62,6 +62,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly DiagnosticsWindow _diagnosticsWindow;
     private readonly LocationService _locationService;
     private readonly ScreenController _screenController;
+    private readonly VenueMembershipStore _venueMembership;
     private readonly WorldVideoRenderer _worldVideoRenderer;
     private readonly BgmDucker _bgmDucker;
     private readonly SpatialAudioController _spatialAudio;
@@ -175,6 +176,8 @@ public sealed class Plugin : IDalamudPlugin
         _locationService = new LocationService(ClientState, ObjectTable, Framework);
         var anchorDir = Path.Combine(PluginInterface.ConfigDirectory.FullName, "screens");
         _screenController = new ScreenController(_locationService, new AnchorStore(anchorDir));
+        var venueDir = Path.Combine(PluginInterface.ConfigDirectory.FullName, "venues");
+        _venueMembership = new VenueMembershipStore(venueDir);
         _screenFocus = new ScreenFocusService(_screenController);
         _worldVideoRenderer = new WorldVideoRenderer(GameGui);
         _bgmDucker = new BgmDucker(
@@ -238,13 +241,18 @@ public sealed class Plugin : IDalamudPlugin
                 _spatialAudio.RevertToFlat(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         };
 
+        // venue-memory spec "Arriving at a remembered location with no active session
+        // automatically rejoins it" — independent of ScreenController's own anchor-restore
+        // subscription, since this cares about session state, not placement.
+        _locationService.LocationChanged += OnLocationChangedForVenueMembership;
+
         _windowSystem.AddWindow(_viewerWindow);
         _windowSystem.AddWindow(_configWindow);
         _windowSystem.AddWindow(_diagnosticsWindow);
         _windowSystem.AddWindow(_placementWindow);
         _windowSystem.AddWindow(_confirmationWindow);
 
-        CommandManager.AddHandler("/wa", new CommandInfo(OnCommand) { HelpMessage = "Toggle the WatchAlong viewer, or run a subcommand (join/invite/sync/settings/place/focus/vol/mute/snapshot)." });
+        CommandManager.AddHandler("/wa", new CommandInfo(OnCommand) { HelpMessage = "Toggle the WatchAlong viewer, or run a subcommand (join/invite/sync/settings/place/focus/forgetvenues/vol/mute/snapshot)." });
 
         PluginInterface.UiBuilder.Draw += OnDraw;
         PluginInterface.UiBuilder.OpenMainUi += OnOpenMainUi;
@@ -261,6 +269,7 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenMainUi -= OnOpenMainUi;
         PluginInterface.UiBuilder.OpenConfigUi -= OnOpenConfigUi;
         CommandManager.RemoveHandler("/wa");
+        _locationService.LocationChanged -= OnLocationChangedForVenueMembership;
         _inviteChatDetector.Dispose();
         _tellRosterListener.Dispose();
         _screenFocus.Dispose();
@@ -411,6 +420,26 @@ public sealed class Plugin : IDalamudPlugin
         return true;
     }
 
+    /// <summary>
+    /// venue-memory spec: silently rejoins a room previously joined at this location, when idle.
+    /// Deliberately does not set <c>_viewerWindow.IsOpen</c> — unlike a manual join, this fires
+    /// ambiently while just walking around, and should only make the world screen (if one is
+    /// anchored here) appear, not pop a window open uninvited. A failed rejoin (stale room) is
+    /// left to <see cref="JoinRoom"/>'s existing no-throw, bool-return contract — no new error UI,
+    /// and no retry until this fires again for a new location change.
+    /// </summary>
+    private void OnLocationChangedForVenueMembership(string locationKey)
+    {
+        if (!Configuration.AutoRejoinRememberedVenues)
+            return;
+        if (_sessionController.CurrentRoomCode is not null)
+            return;
+        if (_venueMembership.TryLoad(locationKey) is not { } roomCode)
+            return;
+
+        JoinRoom(KosmiRoomUrl.ToUrl(roomCode));
+    }
+
     /// <summary>Shared by `/wa join` and the Settings window's join field: a `WA1:` invite goes through the confirmation flow, anything else joins directly like before.</summary>
     private bool HandleJoinInput(string input)
     {
@@ -491,7 +520,13 @@ public sealed class Plugin : IDalamudPlugin
 
                 _viewerWindow.IsOpen = true;
                 if (invite.Anchor is not null)
+                {
                     _screenController.ApplyExternalAnchor(invite.Anchor);
+                    // venue-memory spec "Accepting an anchored invite remembers its room for that
+                    // location": no anchor means no location to key this by, so this stays inside
+                    // the same guard ApplyExternalAnchor already needs.
+                    _venueMembership.Remember(invite.Anchor.LocationKey, invite.RoomCode);
+                }
                 _sessionMembers.Add(invite.Name);
 
                 if (senderCharacterName is not null)
@@ -576,6 +611,11 @@ public sealed class Plugin : IDalamudPlugin
             case "focus":
                 _screenFocus.Toggle();
                 Log.Information($"WatchAlong: {_screenFocus.Status}");
+                break;
+
+            case "forgetvenues":
+                _venueMembership.ClearAll();
+                Log.Information("WatchAlong: forgot every remembered watch-along room.");
                 break;
 
             case "vol" when parts.Length > 1 && float.TryParse(parts[1], out var vol):

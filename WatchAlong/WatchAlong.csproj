@@ -17,6 +17,7 @@ Commands:
 /wa sync &lt;WA1P: message&gt; - apply a shared screen position (with confirmation)
 /wa place - open the screen placement window
 /wa focus - snap the camera to a fullscreen view of your placed screen (move to exit)
+/wa forgetvenues - forget every remembered watch-along room (stops auto-rejoining any of them)
 /wa vol &lt;0-150&gt; - set volume
 /wa mute - toggle mute
 /wa snapshot - save a debug screenshot + DOM outline</Description>

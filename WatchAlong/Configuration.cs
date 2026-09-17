@@ -43,6 +43,9 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>"Show screens in GPose" — off by default (depth-tested-rendering spec).</summary>
     public bool ShowScreensInGPose { get; set; } = false;
 
+    /// <summary>Silently rejoin a room previously joined at a location, on arrival, when idle (venue-memory spec) — on by default per that spec's chosen behavior; an escape hatch since it deliberately skips the usual join confirmation.</summary>
+    public bool AutoRejoinRememberedVenues { get; set; } = true;
+
     // Debug
     public int CefRemoteDebugPort { get; set; } = 0;
     public bool VerboseRendererLog { get; set; } = false;
