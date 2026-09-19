@@ -62,6 +62,11 @@
         "resolved": "2.1.1",
         "contentHash": "5hQRSeg4MnVwxVAPuvW49NbCmpJL1CD9q+OLoIPHzOlduQXQrqhdQ8L+RhFdgg1ifIUVjWyhNF2LhyyvAtivkQ=="
       },
+      "Microsoft.Win32.SystemEvents": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "bYdnhuD0XxcVTrxc8RyBjXo+AXYWJPnda3clhGz2Kakleyun1PyrzYV8RezT7ZYmR9OBSOgvpFQcvHo/K8Y90w=="
+      },
       "SharpGen.Runtime": {
         "type": "Transitive",
         "resolved": "2.4.2-beta",
@@ -75,6 +80,14 @@
           "SharpGen.Runtime": "2.4.2-beta"
         }
       },
+      "System.Drawing.Common": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "kohT9ZZlkB5R5ifihCBnPJLdIUQGiTj1ZI6z4LKatr+F4MmIJJu7qQpBkqt9280ivtnSvlTx9qZEY+CpJ0zMkA==",
+        "dependencies": {
+          "Microsoft.Win32.SystemEvents": "10.0.0"
+        }
+      },
       "Vortice.DirectX": {
         "type": "Transitive",
         "resolved": "3.8.3",
@@ -86,7 +99,10 @@
         }
       },
       "watchalong.shared": {
-        "type": "Project"
+        "type": "Project",
+        "dependencies": {
+          "System.Drawing.Common": "[10.0.0, )"
+        }
       }
     }
   }

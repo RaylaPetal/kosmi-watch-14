@@ -29,6 +29,9 @@ public sealed class WorldVideoRenderer(IGameGui gameGui) : IDisposable
     private GlowRenderer? _glowRenderer;
     private string? _lastInitError;
 
+    private Direct3D11VideoTexture? _placeholderTexture;
+    private string? _placeholderMessage;
+
     /// <summary>Non-null when the depth-tested path failed to initialize (e.g. shader compile failure) or a frame's render call didn't produce output — surfaced for diagnostics; the screen simply doesn't draw that frame.</summary>
     public string? DepthRendererError => _lastInitError;
 
@@ -58,23 +61,44 @@ public sealed class WorldVideoRenderer(IGameGui gameGui) : IDisposable
         RenderWithOcclusion(transform, textureSrv, contentUv);
     }
 
-    /// <summary>No-active-media placeholder (world-screens spec "No active content on a placed screen"): a dim panel with a waiting message instead of the last frame or a blank quad.</summary>
+    /// <summary>
+    /// No-active-media placeholder (world-screens spec "the waiting placeholder is depth-occluded
+    /// like active video"): a dim panel with a waiting message, composited through the same
+    /// per-pixel depth-occluded path as active video (<see cref="RenderWithOcclusion"/>) instead of
+    /// an unoccluded 2D overlay — so it's correctly hidden behind nearer world geometry and
+    /// characters, exactly like a video frame at the same placement would be. Does nothing this
+    /// frame if the depth-tested renderer, camera basis, or captured depth/UI data aren't ready yet,
+    /// same as <see cref="Render"/> (see <see cref="DepthRendererError"/>).
+    /// </summary>
     public void RenderPlaceholder(ScreenTransform transform, string message)
     {
-        var (tl, tr, br, bl) = transform.Corners;
-
-        if (!gameGui.WorldToScreen(tl, out var sTl) ||
-            !gameGui.WorldToScreen(tr, out var sTr) ||
-            !gameGui.WorldToScreen(br, out var sBr) ||
-            !gameGui.WorldToScreen(bl, out var sBl))
+        if (!EnsurePlaceholderTexture(message))
             return;
 
-        var drawList = ImGui.GetBackgroundDrawList(ImGui.GetMainViewport());
-        drawList.AddQuadFilled(sTl, sTr, sBr, sBl, 0xCC1A1A1A);
+        RenderWithOcclusion(transform, _placeholderTexture!.ShaderResourceView, ContentUv.FullFrame);
+    }
 
-        var center = (sTl + sTr + sBr + sBl) / 4f;
-        var textSize = ImGui.CalcTextSize(message);
-        drawList.AddText(center - textSize / 2f, 0xFFFFFFFF, message);
+    /// <returns>False if the placeholder texture isn't available yet (device not ready this frame, or the rasterize/upload failed).</returns>
+    private bool EnsurePlaceholderTexture(string message)
+    {
+        if (_placeholderTexture is null)
+        {
+            var (device, context) = GameDevice.GetD3D11DeviceAndContext();
+            _placeholderTexture = new Direct3D11VideoTexture(device, context);
+        }
+
+        // Only re-rasterize and re-upload when the message actually changed, or the texture was
+        // dropped (e.g. after a device-removed/reset) — not on every frame the placeholder is shown.
+        if (_placeholderTexture.HasTexture && _placeholderMessage == message)
+            return true;
+
+        var pixels = PlaceholderPanelRasterizer.Rasterize(message);
+        const int stride = PlaceholderPanelRasterizer.Width * 4;
+        if (!_placeholderTexture.Upload(pixels, PlaceholderPanelRasterizer.Width, PlaceholderPanelRasterizer.Height, stride, ContentUv.FullFrame))
+            return false;
+
+        _placeholderMessage = message;
+        return true;
     }
 
     private void EnsureDepthTestedResources()
@@ -101,7 +125,8 @@ public sealed class WorldVideoRenderer(IGameGui gameGui) : IDisposable
         }
     }
 
-    /// <returns>False (caller should fall back to the non-occluded quad) if the camera basis, depth data, the video SRV, or the depth-tested renderer aren't ready this frame.</returns>
+    /// <summary>Shared by <see cref="Render"/> and <see cref="RenderPlaceholder"/> — both active video and the waiting placeholder are composited through this same per-pixel depth-occluded path.</summary>
+    /// <returns>False (nothing is drawn this frame) if the camera basis, depth data, the texture SRV, or the depth-tested renderer aren't ready this frame.</returns>
     private bool RenderWithOcclusion(ScreenTransform transform, nint textureSrv, ContentUv contentUv)
     {
         if (_depthRenderer is not { IsInitialized: true } depthRenderer || _depthCapture is not { } depthCapture || depthCapture.CapturedSRV is null)
@@ -193,5 +218,6 @@ public sealed class WorldVideoRenderer(IGameGui gameGui) : IDisposable
         _glowRenderer?.Dispose();
         _uiCapture?.Dispose();
         _depthCapture?.Dispose();
+        _placeholderTexture?.Dispose();
     }
 }

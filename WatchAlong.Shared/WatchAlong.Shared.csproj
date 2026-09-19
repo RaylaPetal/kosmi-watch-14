@@ -8,4 +8,11 @@
     <RootNamespace>WatchAlong.Shared</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Screens/PlaceholderPanelRasterizer.cs rasterizes the "waiting for host" panel text with
+         GDI+ — WatchAlong only ever runs on Windows (a Dalamud/FFXIV plugin), so this needs no
+         cross-platform fallback. -->
+    <PackageReference Include="System.Drawing.Common" Version="10.0.0" />
+  </ItemGroup>
+
 </Project>
